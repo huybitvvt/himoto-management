@@ -19,7 +19,7 @@ const EMPTY_ROWS: ManagementRow[] = [];
 
 function ManagementContent({ kind }: { kind: ManagementKind }) {
   const config = MANAGEMENT_CONFIG[kind];
-  const { dataset, loading, error, source, selectedStore, selectStore, reload, notify } = useManagement();
+  const { dataset, loading, error, source, selectedStore, selectStore, reload, notify, cloneContract } = useManagement();
   const router = useRouter();
   const searchParams = useSearchParams();
   const customerId = kind === 'contracts' ? searchParams.get('customer_id') : null;
@@ -33,6 +33,10 @@ function ManagementContent({ kind }: { kind: ManagementKind }) {
   const [formOpen, setFormOpen] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [printRow, setPrintRow] = useState<ManagementRow | null>(null);
+  const [composerMode, setComposerMode] = useState<'print' | 'edit'>('print');
+  const [cloningId, setCloningId] = useState<number | null>(null);
+  const [cloneError, setCloneError] = useState('');
+  const cloneBusy = useRef(false);
   const columnsRef = useRef<HTMLDetailsElement>(null);
 
   useEffect(() => {
@@ -47,14 +51,7 @@ function ManagementContent({ kind }: { kind: ManagementKind }) {
   }, []);
 
   const rows = dataset?.[kind] || EMPTY_ROWS;
-  const scopedRows = useMemo(() => {
-    if (kind === 'customers') {
-      if (selectedStore === 'all') return rows;
-      const ids = new Set(dataset?.contracts.filter(row => String(row.store_id) === selectedStore).map(row => row.customer_id));
-      return rows.filter(row => ids.has(row.id));
-    }
-    return filterRows(rows, EMPTY_QUERY, selectedStore);
-  }, [rows, dataset, kind, selectedStore]);
+  const scopedRows = useMemo(() => filterRows(rows, EMPTY_QUERY, selectedStore), [rows, selectedStore]);
   const filteredRows = useMemo(() => sortRows(filterRows(scopedRows, query, 'all'), sort.key, sort.direction), [scopedRows, query, sort]);
   const tabRows = filterRows(scopedRows, { ...query, status: '' }, 'all');
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / pageSize));
@@ -85,13 +82,22 @@ function ManagementContent({ kind }: { kind: ManagementKind }) {
     }
     setViewing(row);
   }
+  async function copyContract(row: ManagementRow) {
+    if (cloneBusy.current) return;
+    cloneBusy.current = true; setCloningId(row.id); setCloneError('');
+    try {
+      const copy = await cloneContract(row.id);
+      setPrintRow(copy); setComposerMode('edit'); setComposerOpen(true);
+    } catch (cause) { setCloneError(cause instanceof Error ? cause.message : 'Không sao chép được hợp đồng.'); }
+    finally { cloneBusy.current = false; setCloningId(null); }
+  }
 
   return <section className="mg-page" aria-label={config.title}>
     <div className="mg-page-content">
       <div className="mg-page-heading"><div><div className="mg-eyebrow">DANH MỤC QUẢN LÝ <span>/</span> {String(navigationNumber(kind)).padStart(2, '0')}</div><h1>{config.title}<span className="mg-title-count">{loading || error ? '—' : scopedRows.length}</span></h1><p>{config.description}</p></div>
         <div className="mg-heading-actions"><button type="button" className="mg-button" onClick={exportCsv} disabled={loading || Boolean(error) || !filteredRows.length}><ArrowDownToLine size={17} />Xuất CSV</button>
           {canEdit && <button type="button" className="mg-button mg-button-primary" disabled={loading || Boolean(error)} onClick={() => { setEditing(null); setFormOpen(true); }}><Plus size={18} />{config.addLabel}</button>}
-          {kind === 'contracts' && <><span className="mg-readonly"><ShieldCheck size={16} />Danh sách chỉ đọc</span><button type="button" className="mg-button mg-button-primary" disabled={loading || Boolean(error) || !dataset} onClick={() => { setPrintRow(null); setComposerOpen(true); }}><Printer size={17} />Điền và in hợp đồng</button></>}</div>
+          {kind === 'contracts' && <>{source === 'api' && <span className="mg-readonly"><ShieldCheck size={16} />Danh sách chỉ đọc</span>}<button type="button" className="mg-button mg-button-primary" disabled={loading || Boolean(error) || !dataset} onClick={() => { setPrintRow(null); setComposerMode('print'); setComposerOpen(true); }}><Printer size={17} />Điền và in hợp đồng</button></>}</div>
       </div>
 
       <div className="mg-data-panel">
@@ -106,9 +112,12 @@ function ManagementContent({ kind }: { kind: ManagementKind }) {
         {kind === 'contracts' && <div className="mg-date-filters"><span>Ngày bắt đầu thuê</span><label><span className="mg-sr-only">Từ ngày</span><input type="date" aria-label="Từ ngày" value={query.startDate} onChange={event => updateQuery({ startDate: event.target.value })} aria-invalid={invalidDate} /></label><span className="mg-date-divider">—</span><label><span className="mg-sr-only">Đến ngày</span><input type="date" aria-label="Đến ngày" value={query.endDate} onChange={event => updateQuery({ endDate: event.target.value })} aria-invalid={invalidDate} /></label>{invalidDate && <span className="mg-field-error" role="alert">Ngày kết thúc phải bằng hoặc sau ngày bắt đầu.</span>}
           {customerId && <span className="mg-active-filter">Khách hàng #{customerId}<button type="button" aria-label="Bỏ lọc khách hàng" onClick={() => router.replace('/contracts')}><X size={13} /></button></span>}</div>}
         {isFiltered && <div className="mg-filter-summary"><span><strong>{filteredRows.length}</strong> kết quả phù hợp</span><button type="button" onClick={clearFilters}><RotateCcw size={13} />Xóa bộ lọc</button></div>}
+        {cloneError && <p className="mg-error-message" role="alert">{cloneError}</p>}
         <DataTable config={config} columns={columns} rows={filteredRows.slice(offset, offset + pageSize)} offset={offset} sortKey={sort.key} sortDirection={sort.direction}
-          onSort={key => { setSort(current => ({ key, direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc' })); setPage(1); }} onView={view} onEdit={row => { setEditing(row); setFormOpen(true); }}
-          onPrint={kind === 'contracts' ? row => { setPrintRow(row); setComposerOpen(true); } : undefined}
+          onSort={key => { setSort(current => ({ key, direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc' })); setPage(1); }} onView={view} onEdit={row => { if (kind === 'contracts') { setPrintRow(row); setComposerMode('edit'); setComposerOpen(true); } else { setEditing(row); setFormOpen(true); } }}
+          onPrint={kind === 'contracts' ? row => { setPrintRow(row); setComposerMode('print'); setComposerOpen(true); } : undefined}
+          onClone={kind === 'contracts' && source === 'demo' ? row => void copyContract(row) : undefined} cloningId={cloningId}
+          canEditContract={kind === 'contracts' && source === 'demo'}
           canEdit={canEdit} loading={loading} error={error} isFiltered={isFiltered} onReset={clearFilters} onRetry={() => void reload()} />
         <div className="mg-pagination"><div className="mg-result-range" aria-live="polite">Hiển thị <strong>{filteredRows.length ? offset + 1 : 0}–{Math.min(offset + pageSize, filteredRows.length)}</strong> trong <strong>{filteredRows.length}</strong> {config.singular}</div>
           <div className="mg-pagination-controls"><label>Số dòng<select aria-label="Số dòng mỗi trang" value={pageSize} onChange={event => { setPageSize(Number(event.target.value)); setPage(1); }}>{[10, 20, 50].map(size => <option key={size} value={size}>{size}</option>)}</select></label>
@@ -121,7 +130,7 @@ function ManagementContent({ kind }: { kind: ManagementKind }) {
     </div>
     {formOpen && <EntityForm config={config} row={editing} onClose={() => setFormOpen(false)} />}
     {viewing && kind === 'contracts' && <ContractDetail row={viewing} onClose={() => setViewing(null)} />}
-    {composerOpen && dataset && <ContractComposer row={printRow} onClose={() => setComposerOpen(false)} />}
+    {composerOpen && dataset && <ContractComposer key={`${composerMode}-${printRow?.id || 'new'}`} row={printRow} mode={composerMode} onClose={() => setComposerOpen(false)} />}
     {viewing && kind !== 'contracts' && <Dialog title={String(viewing.name)} subtitle={`${viewing.code} · ${config.title}`} onClose={() => setViewing(null)}>
       <div className="mg-dialog-body"><span className={`mg-status mg-status-${statusTone(viewing.status)}`}><span />{optionLabel(config, 'status', viewing.status)}</span>
         <dl className="mg-detail-grid">{config.columns.filter(column => column.key !== 'name' && column.key !== 'status').map(column => <div key={column.key}><dt>{column.label}</dt><dd>{optionLabel(config, column.key, formatValue(viewing[column.key], column.format))}</dd></div>)}

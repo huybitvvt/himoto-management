@@ -1,3 +1,5 @@
+import type { ContractDraft } from './contract-document';
+
 export type ManagementKind = 'staff' | 'customers' | 'contracts' | 'stores' | 'vehicles';
 export type EditableKind = Exclude<ManagementKind, 'contracts'>;
 export type CellValue = string | number | undefined;
@@ -13,10 +15,21 @@ export interface ManagementRow {
 
 export type ManagementDataset = Record<ManagementKind, ManagementRow[]>;
 
+export interface ContractEdits {
+  draft: ContractDraft;
+  status: string;
+  rental_type: string;
+  notes: string;
+}
+export interface ContractMutationResult { row: ManagementRow; dataset: ManagementDataset }
+export interface CustomerAssignment { status: string; store_id: number }
+
 export interface ManagementRepository {
   source: 'demo' | 'api';
   load(): Promise<ManagementDataset>;
   save(kind: EditableKind, row: ManagementRow): Promise<ManagementDataset>;
+  cloneContract(id: number): Promise<ContractMutationResult>;
+  saveContract(id: number, edits: ContractEdits): Promise<ContractMutationResult>;
   reset(): Promise<ManagementDataset>;
 }
 

@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState, useMemo, ReactNode } from 'react';
 import { createManagementRepository } from '@/lib/management/repository';
-import { EditableKind, ManagementDataset, ManagementRepository, ManagementRow } from '@/lib/management/types';
+import { ContractEdits, CustomerAssignment, EditableKind, ManagementDataset, ManagementRepository, ManagementRow } from '@/lib/management/types';
 import { ContractAutofillRepository, createApiAutofillRepository, createDemoAutofillRepository } from '@/lib/management/contract-autofill';
 import { CustomerDetails } from '@/lib/management/contract-document';
 import { reconcileDataset } from '@/fixtures/management-data';
@@ -19,7 +19,9 @@ interface ManagementContextValue {
   save: (kind: EditableKind, row: ManagementRow) => Promise<void>;
   notify: (message: string) => void;
   contractAutofill: ContractAutofillRepository;
-  createCustomer: (customer: CustomerDetails) => Promise<ManagementRow>;
+  createCustomer: (customer: CustomerDetails, assignment?: CustomerAssignment) => Promise<ManagementRow>;
+  cloneContract: (id: number) => Promise<ManagementRow>;
+  saveContract: (id: number, edits: ContractEdits) => Promise<ManagementRow>;
 }
 const ManagementContext = createContext<ManagementContextValue | null>(null);
 
@@ -53,8 +55,20 @@ export function ManagementProvider({ children }: { children: ReactNode }) {
     setDataset(await repository.reset()); selectStore('all');
     notify('Đã khôi phục dữ liệu mẫu ban đầu.');
   };
-  const createCustomer = async (customer: CustomerDetails) => {
-    const row = await contractAutofill.createCustomer(customer);
+  const cloneContract = async (id: number) => {
+    const result = await repository.cloneContract(id);
+    setDataset(result.dataset);
+    notify(`Đã sao chép thành ${result.row.code} · ID ${result.row.id}. Đang mở form chỉnh sửa. Chỉ lưu trong phiên xem trước.`);
+    return result.row;
+  };
+  const saveContract = async (id: number, edits: ContractEdits) => {
+    const result = await repository.saveContract(id, edits);
+    setDataset(result.dataset);
+    notify(`Đã lưu ${result.row.code}. Thay đổi chỉ lưu trong phiên xem trước.`);
+    return result.row;
+  };
+  const createCustomer = async (customer: CustomerDetails, assignment?: CustomerAssignment) => {
+    const row = await contractAutofill.createCustomer(customer, assignment);
     setDataset(current => {
       if (!current) return current;
       const next = { ...current, customers: [row, ...current.customers.filter(item => item.id !== row.id)] };
@@ -63,7 +77,7 @@ export function ManagementProvider({ children }: { children: ReactNode }) {
     notify(repository.source === 'demo' ? 'Đã thêm khách hàng mẫu và điền vào hợp đồng. Chỉ lưu trong phiên xem trước.' : 'Đã tạo khách hàng và điền vào hợp đồng.');
     return row;
   };
-  return <ManagementContext.Provider value={{ dataset, loading, error, source: repository.source, selectedStore, selectStore, reload, reset, save, notify, contractAutofill, createCustomer }}>
+  return <ManagementContext.Provider value={{ dataset, loading, error, source: repository.source, selectedStore, selectStore, reload, reset, save, notify, contractAutofill, createCustomer, cloneContract, saveContract }}>
     {children}
     {notification && <div className="mg-toast" role="status"><span>{notification}</span><button type="button" onClick={() => notify('')} aria-label="Đóng thông báo">×</button></div>}
   </ManagementContext.Provider>;

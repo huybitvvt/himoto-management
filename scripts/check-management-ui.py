@@ -130,7 +130,8 @@ with sync_playwright() as p:
         expect(page.locator('.mg-table tbody tr')).to_have_count(10)
         assert page.locator('.mg-heading-actions button').count() == 2
         expect(page.get_by_role('button', name='Điền và in hợp đồng', exact=True)).to_be_visible()
-        assert page.locator('.mg-row-actions button[aria-label^="Sửa"]').count() == 0
+        assert page.locator('.mg-row-actions button[aria-label^="Sửa"]').count() > 0
+        assert page.locator('.mg-row-actions button[aria-label^="Sao chép hợp đồng"]').count() > 0
         page.get_by_role('button', name='Xem HD-2610-001', exact=True).click()
         expect(page.get_by_role('dialog')).to_be_visible()
         expect(page.get_by_role('dialog').get_by_text('Chi tiết hợp đồng: HD-2610-001')).to_be_visible()
@@ -144,7 +145,7 @@ with sync_playwright() as p:
         for value in page.locator('.mg-table tbody tr td:nth-child(6)').all_text_contents():
             day, month, year = value.split('/')
             assert '2026-10-03' <= f'{year}-{month}-{day}' <= '2026-10-05'
-        record('customer create, related contracts, read-only contract view, reused detail and date range')
+        record('customer create, related contracts, contract copy/edit actions, reused detail and date range')
 
         page.set_viewport_size({'width': 375, 'height': 812})
         page.get_by_role('button', name='Mở menu', exact=True).click()

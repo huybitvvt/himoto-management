@@ -1,11 +1,12 @@
 import { CustomerDetails, normalizeIdCard, staffMatchesStore, validateCustomer } from './contract-document';
 import { mapApiRow, READ_ENDPOINTS } from './repository';
-import { ManagementRepository, ManagementRow } from './types';
+import { CustomerAssignment, ManagementRepository, ManagementRow } from './types';
+import { CUSTOMER_STATUSES } from './config';
 
 export interface ContractAutofillRepository {
   lookupCustomer(idCard: string, signal?: AbortSignal): Promise<ManagementRow | null>;
   loadStaff(storeId: string, signal?: AbortSignal): Promise<ManagementRow[]>;
-  createCustomer(customer: CustomerDetails): Promise<ManagementRow>;
+  createCustomer(customer: CustomerDetails, assignment?: CustomerAssignment): Promise<ManagementRow>;
 }
 export function createDemoAutofillRepository(repository: ManagementRepository): ContractAutofillRepository {
   return {
@@ -17,13 +18,18 @@ export function createDemoAutofillRepository(repository: ManagementRepository): 
       return matches[0] || null;
     },
     async loadStaff(storeId, signal) { signal?.throwIfAborted(); return staffMatchesStore((await repository.load()).staff, storeId); },
-    async createCustomer(customer) {
+    async createCustomer(customer, assignment) {
       const errors = validateCustomer(customer, 'demo');
       if (Object.keys(errors).length) throw new Error(Object.values(errors)[0]);
       const dataset = await repository.load();
+      const store_id = assignment?.store_id ?? dataset.stores[0]?.id;
+      const status = assignment?.status ?? (customer.warning_note ? 'warning' : 'active');
+      if (!dataset.stores.some(store => store.id === store_id)) throw new Error('Chọn một cơ sở hợp lệ cho khách hàng.');
+      if (!CUSTOMER_STATUSES.some(option => option.value === status)) throw new Error('Trạng thái khách hàng không hợp lệ.');
       if (dataset.customers.some(row => normalizeIdCard(String(row.id_card || '')) === normalizeIdCard(customer.id_card))) throw new Error('Số CCCD/CMND này đã có. Hãy tra cứu khách hàng thay vì tạo thêm.');
       const id = Math.max(0, ...dataset.customers.map(row => row.id)) + 1;
-      const row: ManagementRow = { ...customer, id, code: `KH-${String(id).padStart(3, '0')}`, status: customer.warning_note ? 'warning' : 'active', id_card: normalizeIdCard(customer.id_card), created_at: new Date().toISOString().slice(0, 10) };
+      const row: ManagementRow = { ...customer, id, code: `KH-${String(id).padStart(3, '0')}`, status, store_id, store_name: dataset.stores.find(store => store.id === store_id)?.name,
+        id_card: normalizeIdCard(customer.id_card), created_at: new Date().toISOString().slice(0, 10) };
       await repository.save('customers', row);
       return row;
     },
@@ -68,7 +74,8 @@ export function createApiAutofillRepository(baseUrl = '/api'): ContractAutofillR
       }
       throw new Error('Danh sách nhân sự vượt giới hạn tải.');
     },
-    async createCustomer(customer) {
+    async createCustomer(customer, assignment) {
+      if (assignment) throw new Error('API tạo khách hàng hiện chưa hỗ trợ lưu trạng thái và cơ sở.');
       const errors = validateCustomer(customer, 'api');
       if (Object.keys(errors).length) throw new Error(Object.values(errors)[0]);
       if (await this.lookupCustomer(customer.id_card)) throw new Error('Số CCCD/CMND này đã có. Hãy tra cứu khách hàng thay vì tạo thêm.');

@@ -43,6 +43,11 @@ function nowDate() {
   return ['year', 'month', 'day'].map(type => parts.find(part => part.type === type)?.value).join('-');
 }
 export function createContractDraft(dataset: ManagementDataset, storeId: string, row?: ManagementRow | null): ContractDraft {
+  if (row?.draft_json) {
+    const snapshot = JSON.parse(String(row.draft_json)) as ContractDraft;
+    if (!snapshot.customer || !Array.isArray(snapshot.vehicles) || !snapshot.vehicles.length) throw new Error('Thông tin hợp đồng đã lưu không hợp lệ.');
+    return { ...structuredClone(snapshot), contract_number: row.code };
+  }
   const customer = customerDetails(row ? dataset.customers.find(item => item.id === row.customer_id) || { ...row, name: value(row.customer_name), phone: value(row.customer_phone), id_card: value(row.customer_id_card) } : null);
   const vehicle = row ? dataset.vehicles.find(item => item.id === row.vehicle_id) : null;
   return { contract_number: row?.code || '', signed_on: dateInput(row?.created_at) || nowDate(),

@@ -44,7 +44,7 @@ export function EntityForm({ config, row, onClose }: { config: ManagementConfig;
       requestAnimationFrame(() => formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
       return;
     }
-    if (config.kind === 'contracts') return; // Contract writes are excluded at both UI and repository levels.
+    if (config.kind === 'contracts') return; // Contract edits use their dedicated snapshot-aware form and repository methods.
     const prepared = { ...draft };
     for (const field of config.fields) {
       const value = String(draft[field.key] ?? '').trim();
@@ -68,7 +68,7 @@ export function EntityForm({ config, row, onClose }: { config: ManagementConfig;
             setErrors(current => ({ ...current, [field.key]: '' }));
           } };
         return <div key={field.key} className={`mg-field ${field.wide ? 'mg-field-wide' : ''}`}><label htmlFor={id}>{field.label}{field.required && <span aria-hidden="true"> *</span>}</label>
-          {field.type === 'select' ? <select {...props} required={field.required}>{options?.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+          {field.type === 'select' ? <select {...props} required={field.required}>{field.storeOptions && <option value="">Chọn cơ sở</option>}{options?.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
             : field.type === 'textarea' ? <textarea {...props} rows={3} /> : <input {...props} type={field.type || 'text'} required={field.required} min={field.type === 'number' ? 0 : undefined} step={field.type === 'number' ? 1 : undefined} />}
           {field.hint && <small id={`${id}-hint`}>{field.hint}</small>}{errors[field.key] && <p id={`${id}-error`} className="mg-field-error">{errors[field.key]}</p>}
         </div>;

@@ -1,5 +1,6 @@
 import { createDemoDataset, reconcileDataset } from '@/fixtures/management-data';
 import { EditableKind, ManagementDataset, ManagementKind, ManagementRepository, ManagementRow } from './types';
+import { cloneContractRecord, updateContractRecord } from './contract-record';
 
 export function createDemoRepository(): ManagementRepository {
   let dataset = createDemoDataset();
@@ -14,6 +15,16 @@ export function createDemoRepository(): ManagementRepository {
         ? records.map(r => r.id === row.id ? { ...row } : r)
         : [{ ...row }, ...records] });
       return structuredClone(dataset);
+    },
+    async cloneContract(id) {
+      const row = cloneContractRecord(dataset, id);
+      dataset = reconcileDataset({ ...dataset, contracts: [row, ...dataset.contracts] });
+      return structuredClone({ row, dataset });
+    },
+    async saveContract(id, edits) {
+      const row = updateContractRecord(dataset, id, edits);
+      dataset = reconcileDataset({ ...dataset, contracts: dataset.contracts.map(record => record.id === id ? row : record) });
+      return structuredClone({ row, dataset });
     },
     async reset() { dataset = createDemoDataset(); return structuredClone(dataset); },
   };
@@ -53,7 +64,7 @@ export function mapApiRow(kind: ManagementKind, raw: ApiRow): ManagementRow {
   if (kind === 'customers') return { ...base, id_card: text(raw.id_card || raw.identity_card), warning_note: text(raw.warning || raw.warning_note),
     id_card_issued_on: text(raw.id_card_issued_on || raw.id_card_date), id_card_issued_by: text(raw.id_card_issued_by || raw.id_card_place),
     birthday: text(raw.birthday || raw.date_of_birth), relatives_text: text(raw.relatives_text) || relativesText(raw.relatives),
-    contract_count: number(raw.contract_count), status: raw.warning || raw.warning_note ? 'warning' :
+    contract_count: number(raw.contract_count), status: ['blacklist', 'bad_debt'].includes(base.status) ? 'blacklist' : raw.warning || raw.warning_note ? 'warning' :
       (({ '1': 'active', '0': 'draft' } as Record<string, string>)[base.status] || base.status) };
   if (kind === 'vehicles') return { ...base, license: text(raw.license), brand: text(raw.brand), type: text(raw.type),
     odometer: number(raw.odometer), daily_price: number(raw.daily_price), monthly_price: number(raw.monthly_price), year: text(raw.year),
@@ -105,12 +116,14 @@ export function createApiRepository(baseUrl = '/api'): ManagementRepository {
       const values = await Promise.all(kinds.map(read));
       const dataset = Object.fromEntries(kinds.map((kind, i) => [kind, values[i]])) as ManagementDataset;
       // Only resolve labels; API aggregates and contract values are never fabricated.
-      for (const kind of ['staff', 'vehicles', 'contracts'] as const) {
+      for (const kind of ['staff', 'customers', 'vehicles', 'contracts'] as const) {
         dataset[kind] = dataset[kind].map(row => ({ ...row, store_name: row.store_name || dataset.stores.find(s => s.id === row.store_id)?.name }));
       }
       return dataset;
     },
     async save() { throw new Error('Chức năng ghi API chưa được tích hợp.'); },
+    async cloneContract() { throw new Error('Chưa có API sao chép hợp đồng từ module hiện có.'); },
+    async saveContract() { throw new Error('Chưa tích hợp API lưu chỉnh sửa hợp đồng.'); },
     async reset() { throw new Error('Không thể đặt lại dữ liệu API.'); },
   };
 }

@@ -2,7 +2,7 @@ import { ManagementConfig, ManagementKind, Option } from './types';
 import { ORDER_STATUS } from '@/lib/formatters';
 
 export const STAFF_STATUSES: Option[] = [{ value: 'active', label: 'Đang làm việc' }, { value: 'inactive', label: 'Tạm nghỉ' }, { value: 'leave', label: 'Đã nghỉ việc' }];
-export const CUSTOMER_STATUSES: Option[] = [{ value: 'active', label: 'Bình thường' }, { value: 'warning', label: 'Cần lưu ý' }, { value: 'draft', label: 'Chưa hoàn tất' }];
+export const CUSTOMER_STATUSES: Option[] = [{ value: 'active', label: 'Bình thường' }, { value: 'warning', label: 'Cần lưu ý' }, { value: 'blacklist', label: 'Blacklist (khách nợ xấu)' }, { value: 'draft', label: 'Chưa hoàn tất' }];
 export const STORE_STATUSES: Option[] = [{ value: 'active', label: 'Hoạt động' }, { value: 'inactive', label: 'Tạm ngừng' }];
 export const VEHICLE_STATUSES: Option[] = [
   { value: 'ready', label: 'Sẵn sàng' }, { value: 'using', label: 'Đang thuê' }, { value: 'repairing', label: 'Bảo dưỡng' },
@@ -11,8 +11,8 @@ export const VEHICLE_STATUSES: Option[] = [
 ];
 export const VEHICLE_TYPES: Option[] = [{ value: 'xega', label: 'Xe ga' }, { value: 'xeso', label: 'Xe số' }, { value: 'xecon', label: 'Xe côn tay' }, { value: 'xesh', label: 'Xe SH' }, { value: 'electric', label: 'Xe điện (mẫu)' }];
 export const POSITIONS: Option[] = ['Quản lý cơ sở', 'Nhân viên kinh doanh', 'Thu ngân', 'Kỹ thuật viên'].map(label => ({ value: label, label }));
-const CONTRACT_STATUSES: Option[] = [{ value: 'renting', label: 'Đang thuê' }, { value: 'completed', label: 'Hoàn thành' }, { value: 'pending', label: 'Chờ giao xe' }, { value: 'overdue', label: 'Quá hạn' }, { value: 'cancelled', label: 'Đã hủy' }];
-const CONTRACT_TYPES: Option[] = [{ value: 'daily', label: 'Thuê theo ngày' }, { value: 'monthly', label: 'Thuê theo tháng' }, { value: 'tour', label: 'Tour / phượt (mẫu)' }];
+export const CONTRACT_STATUSES: Option[] = [{ value: 'renting', label: 'Đang thuê' }, { value: 'completed', label: 'Hoàn thành' }, { value: 'pending', label: 'Chờ giao xe' }, { value: 'overdue', label: 'Quá hạn' }, { value: 'cancelled', label: 'Đã hủy' }];
+export const CONTRACT_TYPES: Option[] = [{ value: 'daily', label: 'Thuê theo ngày' }, { value: 'monthly', label: 'Thuê theo tháng' }, { value: 'tour', label: 'Tour / phượt (mẫu)' }];
 const branchField = { key: 'store_id', label: 'Cơ sở', type: 'select' as const, storeOptions: true, required: true };
 const codeColumn = { key: 'code', label: 'Mã', format: 'code' as const };
 const statusColumn = { key: 'status', label: 'Trạng thái', format: 'status' as const };
@@ -38,16 +38,16 @@ export const MANAGEMENT_CONFIG: Record<ManagementKind, ManagementConfig> = {
     searchPlaceholder: 'Tìm tên, số điện thoại hoặc giấy tờ…', statuses: CUSTOMER_STATUSES, filters: [],
     columns: [codeColumn, { key: 'name', label: 'Khách hàng', format: 'person', secondary: 'email' },
       { key: 'phone', label: 'Số điện thoại' }, { key: 'id_card', label: 'Giấy tờ định danh' }, { key: 'address', label: 'Địa chỉ' },
-      { key: 'contract_count', label: 'Hợp đồng', format: 'number', align: 'right' }, statusColumn],
+      branchColumn, { key: 'contract_count', label: 'Hợp đồng', format: 'number', align: 'right' }, statusColumn],
     fields: [{ key: 'name', label: 'Họ và tên', required: true }, { key: 'phone', label: 'Số điện thoại', type: 'tel', required: true },
       { key: 'id_card', label: 'Giấy tờ định danh', hint: 'Có thể bổ sung sau đối với hồ sơ chưa hoàn tất.' },
       { key: 'email', label: 'Email', type: 'email' }, { key: 'address', label: 'Địa chỉ', wide: true },
-      { key: 'status', label: 'Trạng thái hồ sơ', type: 'select', options: CUSTOMER_STATUSES, required: true },
+      branchField, { key: 'status', label: 'Trạng thái hồ sơ', type: 'select', options: CUSTOMER_STATUSES, required: true },
       { key: 'warning_note', label: 'Ghi chú / cảnh báo', type: 'textarea', wide: true }],
   },
   contracts: {
     kind: 'contracts', title: 'Danh sách hợp đồng', singular: 'hợp đồng',
-    description: 'Tra cứu hợp đồng và thông tin thuê xe. Danh sách chỉ đọc.',
+    description: 'Tra cứu, sao chép và chỉnh sửa thông tin hợp đồng.',
     searchPlaceholder: 'Tìm mã hợp đồng, khách hàng hoặc biển số…', statuses: CONTRACT_STATUSES,
     filters: [{ key: 'rental_type', label: 'Tất cả loại hợp đồng', options: CONTRACT_TYPES }],
     columns: [{ ...codeColumn, label: 'Mã hợp đồng' }, { key: 'customer_name', label: 'Khách hàng', format: 'person', secondary: 'customer_phone' },
@@ -100,6 +100,6 @@ export function statusTone(status: string): string {
   if (['active', 'ready', 'completed'].includes(status)) return 'green';
   if (['using', 'renting', 'in_transit'].includes(status)) return 'blue';
   if (['warning', 'repairing', 'pending', 'draft'].includes(status)) return 'amber';
-  if (['overdue', 'bad_debt', 'broken'].includes(status)) return 'red';
+  if (['overdue', 'bad_debt', 'blacklist', 'broken'].includes(status)) return 'red';
   return 'gray';
 }

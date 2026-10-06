@@ -2,6 +2,8 @@
 
 Phạm vi bổ sung ngày 06/10/2026: điền thông tin cho mẫu in tại màn danh sách hợp đồng, lọc nhân sự theo cơ sở, tìm khách hàng bằng giấy tờ, thêm khách hàng bằng modal. Không phát hành hợp đồng hoặc thực hiện nghiệp vụ đơn thuê xe.
 
+Phần bổ sung tiếp theo cho phép sao chép/lưu chỉnh sửa bản ghi demo với ID/mã riêng và thêm Blacklist/cơ sở cho khách hàng. Xem [sao chép hợp đồng](contract-clone.md); chế độ API hợp đồng vẫn chỉ đọc và cần kết nối riêng.
+
 ## Giao diện
 
 - Mở nút **Điền và in hợp đồng** để soạn mẫu mới, hoặc icon máy in của một dòng để đổ dữ liệu hợp đồng đã có.

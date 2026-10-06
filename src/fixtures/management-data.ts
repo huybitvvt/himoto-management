@@ -25,12 +25,14 @@ export function createDemoDataset(): ManagementDataset {
   });
   const customers: ManagementRow[] = Array.from({ length: 32 }, (_, i) => {
     const source = INITIAL_CUSTOMERS[i % INITIAL_CUSTOMERS.length];
+    const store = stores[i % stores.length];
     return { ...source, id: i + 1, code: `KH-${pad(i + 1)}`, name: names[(i + 3) % names.length],
       phone: phone(i + 101), email: `khachhang${i + 1}@example.test`, id_card: `DEMO-${String(i + 1).padStart(6, '0')}`,
-      address: `Địa chỉ mẫu ${i + 1}, Hà Nội`, status: i % 9 === 8 ? 'warning' : 'active',
+      address: `Địa chỉ mẫu ${i + 1}, Hà Nội`, store_id: store.id, store_name: store.name,
+      status: i % 13 === 12 ? 'blacklist' : i % 9 === 8 ? 'warning' : 'active',
       birthday: '1995-05-20', id_card_issued_on: '2024-01-15', id_card_issued_by: 'Nơi cấp mẫu',
       relatives_text: 'Người thân mẫu · 0900000099',
-      warning_note: i % 9 === 8 ? 'Ghi chú mẫu: cần kiểm tra thông tin liên hệ.' : '',
+      warning_note: i % 13 === 12 ? 'Ghi chú mẫu: khách nợ xấu.' : i % 9 === 8 ? 'Ghi chú mẫu: cần kiểm tra thông tin liên hệ.' : '',
       created_at: '2026-09-01' };
   });
   const vehicles: ManagementRow[] = Array.from({ length: 40 }, (_, i) => {
@@ -67,6 +69,8 @@ export function reconcileDataset(dataset: ManagementDataset): ManagementDataset 
   }));
   const withStore = (row: ManagementRow): ManagementRow => ({ ...row, store_name: stores.find(s => s.id === row.store_id)?.name ?? row.store_name });
   const contracts: ManagementRow[] = dataset.contracts.map(row => {
+    // Saved contracts retain their own customer/vehicle snapshot, independently of master data edits.
+    if (row.draft_json) return row;
     const customer = dataset.customers.find(c => c.id === row.customer_id);
     const vehicle = dataset.vehicles.find(v => v.id === row.vehicle_id);
     // A contract's originating branch does not change when a vehicle moves.
@@ -76,5 +80,5 @@ export function reconcileDataset(dataset: ManagementDataset): ManagementDataset 
       vehicle_name: vehicle?.name ?? row.vehicle_name, license: vehicle?.license ?? row.license };
   });
   return { stores, staff: dataset.staff.map(withStore), vehicles: dataset.vehicles.map(withStore), contracts,
-    customers: dataset.customers.map(c => ({ ...c, contract_count: contracts.filter(r => r.customer_id === c.id).length })) };
+    customers: dataset.customers.map(c => ({ ...withStore(c), contract_count: contracts.filter(r => r.customer_id === c.id).length })) };
 }
