@@ -2,6 +2,8 @@
 
 Frontend Next.js + TypeScript cho năm màn dạng bảng: Nhân sự, Khách hàng, Hợp đồng (chỉ đọc), Cơ sở, Danh sách xe.
 
+Demo: **https://himoto-management.vercel.app**. Repo private: https://github.com/huybitvvt/himoto-management. Vercel đã kết nối repo, nhánh `main`.
+
 ```bash
 npm ci
 npm run dev
@@ -21,4 +23,4 @@ Kiểm tra browser (cần Python Playwright và Chromium): `python scripts/check
 
 Đã kiểm tra bản production: build, TypeScript, lint, 8 kiểm tra dữ liệu/adapter, 8 nhóm tương tác, 5 màn ở desktop 1440px và mobile 375px. Không phát hiện lỗi JavaScript hoặc request ghi API trong các ca đã chạy.
 
-![Danh sách xe trên desktop](docs/qa/vehicles-1440.png)
+![Danh sách xe trên Vercel](docs/qa/vercel/vehicles-1440.png)
