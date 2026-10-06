@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowDown, ArrowUp, ArrowUpDown, ArrowUpRight, Eye, FileSearch, LoaderCircle, Pencil, RotateCcw } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ArrowUpRight, Eye, FileSearch, LoaderCircle, Pencil, Printer, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 import { ManagementColumn, ManagementConfig, ManagementRow } from '@/lib/management/types';
 import { optionLabel, statusTone } from '@/lib/management/config';
@@ -28,6 +28,7 @@ interface Props {
   onSort: (key: string) => void;
   onView: (row: ManagementRow) => void;
   onEdit: (row: ManagementRow) => void;
+  onPrint?: (row: ManagementRow) => void;
   canEdit: boolean;
   loading: boolean;
   error: string;
@@ -36,7 +37,7 @@ interface Props {
   onRetry: () => void;
 }
 
-export function DataTable({ config, columns, rows, offset, sortKey, sortDirection, onSort, onView, onEdit, canEdit, loading, error, isFiltered, onReset, onRetry }: Props) {
+export function DataTable({ config, columns, rows, offset, sortKey, sortDirection, onSort, onView, onEdit, onPrint, canEdit, loading, error, isFiltered, onReset, onRetry }: Props) {
   const columnCount = columns.length + 2;
   return <div className="mg-table-scroll" tabIndex={0} role="region" aria-label={`Bảng ${config.title.toLowerCase()}, cuộn ngang để xem thêm cột`}>
     <table className={`mg-table mg-table-${config.kind}`} aria-busy={loading}>
@@ -50,6 +51,7 @@ export function DataTable({ config, columns, rows, offset, sortKey, sortDirectio
         : rows.length === 0 ? <tr><td colSpan={columnCount}><div className="mg-table-state"><FileSearch size={32} /><strong>{isFiltered ? 'Không tìm thấy kết quả' : 'Danh sách đang trống'}</strong><p>{isFiltered ? 'Thử từ khóa khác hoặc bỏ bớt bộ lọc.' : 'Chưa có bản ghi để hiển thị.'}</p>{isFiltered && <button className="mg-button" onClick={onReset}>Xóa bộ lọc</button>}</div></td></tr>
         : rows.map((row, index) => <tr key={row.id}><td className="mg-index">{offset + index + 1}</td>{columns.map(column => <td key={column.key} className={column.align === 'right' ? 'mg-align-right' : ''}><Cell row={row} column={column} config={config} /></td>)}
           <td className="mg-actions-column"><div className="mg-row-actions"><button className="mg-icon-button" type="button" aria-label={`Xem ${row.code}`} title="Xem chi tiết" onClick={() => onView(row)}><Eye size={17} /></button>
+            {config.kind === 'contracts' && onPrint && <button className="mg-icon-button" type="button" aria-label={`Điền và in ${row.code}`} title="Điền và in hợp đồng" onClick={() => onPrint(row)}><Printer size={17} /></button>}
             {config.kind === 'contracts' ? <Link className="mg-icon-button" href={rentalModuleUrl} aria-label={`Mở module đơn thuê xe từ ${row.code}`} title="Mở module đơn thuê xe"><ArrowUpRight size={17} /></Link>
               : canEdit && <button className="mg-icon-button" type="button" aria-label={`Sửa ${row.code}`} title="Chỉnh sửa" onClick={() => onEdit(row)}><Pencil size={16} /></button>}</div></td></tr>)}</tbody>
     </table>

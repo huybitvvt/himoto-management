@@ -274,3 +274,42 @@
 .mg-identity small, .mg-status { font-size: 11px; }
 .mg-code { font-size: 11px; }
 @media (prefers-reduced-motion: reduce) { .mg-app *, .mg-dialog * { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+
+.mg-contract-composer { width: 880px; }
+.mg-dialog-header > div { min-width: 0; }
+.mg-dialog-header > .mg-icon-button { flex-shrink: 0; }
+.mg-composer-notice { padding: 12px 15px; background: #fff8e5; border: 1px solid #f2dfab; border-radius: 8px; font-size: 12px; line-height: 1.7; margin-bottom: 24px; color: #6d5416; }
+.mg-composer-section { border: 0; padding: 0; margin: 0 0 28px; min-width: 0; }
+.mg-composer-section legend { display: flex; align-items: center; gap: 9px; font-size: 15px; font-weight: 650; margin-bottom: 16px; color: #2b3644; width: 100%; padding: 0; }
+.mg-composer-section legend > span { color: #8b6705; background: #fff5d5; font-size: 11px; padding: 5px 7px; border-radius: 5px; }
+.mg-lookup-controls { display: flex; gap: 9px; }
+.mg-lookup-controls input { flex: 1; min-width: 0; }
+.mg-lookup-controls .mg-button { flex-shrink: 0; }
+.mg-lookup-status { color: #607085; font-size: 12px; padding: 9px 0 0; }
+.mg-lookup-status.is-found { color: #087450; }
+.mg-lookup-status.is-error { color: #bc3037; }
+.mg-lookup-status.is-missing { color: #8d6514; }
+.mg-customer-autofill { margin-top: 18px; }
+.mg-create-customer-inline { margin-top: 12px; }
+.mg-composer-hint { font-size: 11px; line-height: 1.7; margin: 12px 0 0; color: #607085; }
+.mg-composer-person { display: flex; align-items: center; gap: 8px; padding: 10px 13px; border-radius: 7px; background: #edf7f2; color: #087450; }
+.mg-inline-button { border: 0; background: transparent; color: #805900; text-decoration: underline; margin-left: 8px; padding: 4px; }
+.mg-composer-vehicle { padding: 16px; border: 1px solid #e4eaf0; background: #fbfcfd; border-radius: 9px; margin: 18px 0 12px; }
+.mg-composer-vehicle-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.mg-composer-vehicle .mg-form-grid { margin-top: 13px; }
+.mg-composer-vehicle-summary { font-size: 12px; color: #607085; padding-top: 8px; }
+.mg-table-contracts .mg-actions-column { width: 112px; min-width: 112px; }
+.mg-contract-print-dialog { width: 1200px; }
+.mg-contract-print-toolbar { padding: 15px 24px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.mg-contract-print-toolbar p { font-size: 12px; color: #607085; margin: 0; }
+.mg-contract-print-toolbar .mg-button { flex-shrink: 0; }
+.mg-contract-paper-scroll { padding: 18px; overflow: auto; background: #e8ecf1; max-width: 100%; }
+.mg-contract-paper-scroll .contract-print-wrapper { width: 285mm; }
+.mg-contract-print-frame { position: fixed; width: 1px; height: 1px; border: 0; left: -10000px; top: 0; }
+@media (max-width: 600px) {
+  .mg-contract-print-toolbar { flex-wrap: wrap; padding: 16px 20px; }
+  .mg-contract-print-toolbar .mg-button { width: 100%; justify-content: center; }
+  .mg-composer-vehicle { padding: 12px; }
+  .mg-composer-person { align-items: flex-start; }
+  .mg-composer-person svg { flex-shrink: 0; margin-top: 3px; }
+}

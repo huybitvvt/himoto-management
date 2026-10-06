@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowDownToLine, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Columns3, ListFilter, Plus, RotateCcw, Search, ShieldCheck, X } from 'lucide-react';
+import { ArrowDownToLine, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Columns3, ListFilter, Plus, Printer, RotateCcw, Search, ShieldCheck, X } from 'lucide-react';
 import { MANAGEMENT_CONFIG, optionLabel, statusTone } from '@/lib/management/config';
 import { EMPTY_QUERY, TableQuery, csvCell, filterRows, formatValue, sortRows } from '@/lib/management/table-utils';
 import { ManagementKind, ManagementRow } from '@/lib/management/types';
@@ -13,6 +13,7 @@ import { Dialog } from './Dialog';
 import { EntityForm } from './EntityForm';
 import { ContractDetail } from './ContractDetail';
 import { rentalModuleUrl } from '@/lib/management/links';
+import { ContractComposer } from '@/components/contracts/ContractComposer';
 
 const EMPTY_ROWS: ManagementRow[] = [];
 
@@ -30,6 +31,8 @@ function ManagementContent({ kind }: { kind: ManagementKind }) {
   const [viewing, setViewing] = useState<ManagementRow | null>(null);
   const [editing, setEditing] = useState<ManagementRow | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [printRow, setPrintRow] = useState<ManagementRow | null>(null);
   const columnsRef = useRef<HTMLDetailsElement>(null);
 
   useEffect(() => {
@@ -88,7 +91,7 @@ function ManagementContent({ kind }: { kind: ManagementKind }) {
       <div className="mg-page-heading"><div><div className="mg-eyebrow">DANH MỤC QUẢN LÝ <span>/</span> {String(navigationNumber(kind)).padStart(2, '0')}</div><h1>{config.title}<span className="mg-title-count">{loading || error ? '—' : scopedRows.length}</span></h1><p>{config.description}</p></div>
         <div className="mg-heading-actions"><button type="button" className="mg-button" onClick={exportCsv} disabled={loading || Boolean(error) || !filteredRows.length}><ArrowDownToLine size={17} />Xuất CSV</button>
           {canEdit && <button type="button" className="mg-button mg-button-primary" disabled={loading || Boolean(error)} onClick={() => { setEditing(null); setFormOpen(true); }}><Plus size={18} />{config.addLabel}</button>}
-          {kind === 'contracts' && <span className="mg-readonly"><ShieldCheck size={16} />Chỉ đọc</span>}</div>
+          {kind === 'contracts' && <><span className="mg-readonly"><ShieldCheck size={16} />Danh sách chỉ đọc</span><button type="button" className="mg-button mg-button-primary" disabled={loading || Boolean(error) || !dataset} onClick={() => { setPrintRow(null); setComposerOpen(true); }}><Printer size={17} />Điền và in hợp đồng</button></>}</div>
       </div>
 
       <div className="mg-data-panel">
@@ -105,6 +108,7 @@ function ManagementContent({ kind }: { kind: ManagementKind }) {
         {isFiltered && <div className="mg-filter-summary"><span><strong>{filteredRows.length}</strong> kết quả phù hợp</span><button type="button" onClick={clearFilters}><RotateCcw size={13} />Xóa bộ lọc</button></div>}
         <DataTable config={config} columns={columns} rows={filteredRows.slice(offset, offset + pageSize)} offset={offset} sortKey={sort.key} sortDirection={sort.direction}
           onSort={key => { setSort(current => ({ key, direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc' })); setPage(1); }} onView={view} onEdit={row => { setEditing(row); setFormOpen(true); }}
+          onPrint={kind === 'contracts' ? row => { setPrintRow(row); setComposerOpen(true); } : undefined}
           canEdit={canEdit} loading={loading} error={error} isFiltered={isFiltered} onReset={clearFilters} onRetry={() => void reload()} />
         <div className="mg-pagination"><div className="mg-result-range" aria-live="polite">Hiển thị <strong>{filteredRows.length ? offset + 1 : 0}–{Math.min(offset + pageSize, filteredRows.length)}</strong> trong <strong>{filteredRows.length}</strong> {config.singular}</div>
           <div className="mg-pagination-controls"><label>Số dòng<select aria-label="Số dòng mỗi trang" value={pageSize} onChange={event => { setPageSize(Number(event.target.value)); setPage(1); }}>{[10, 20, 50].map(size => <option key={size} value={size}>{size}</option>)}</select></label>
@@ -117,6 +121,7 @@ function ManagementContent({ kind }: { kind: ManagementKind }) {
     </div>
     {formOpen && <EntityForm config={config} row={editing} onClose={() => setFormOpen(false)} />}
     {viewing && kind === 'contracts' && <ContractDetail row={viewing} onClose={() => setViewing(null)} />}
+    {composerOpen && dataset && <ContractComposer row={printRow} onClose={() => setComposerOpen(false)} />}
     {viewing && kind !== 'contracts' && <Dialog title={String(viewing.name)} subtitle={`${viewing.code} · ${config.title}`} onClose={() => setViewing(null)}>
       <div className="mg-dialog-body"><span className={`mg-status mg-status-${statusTone(viewing.status)}`}><span />{optionLabel(config, 'status', viewing.status)}</span>
         <dl className="mg-detail-grid">{config.columns.filter(column => column.key !== 'name' && column.key !== 'status').map(column => <div key={column.key}><dt>{column.label}</dt><dd>{optionLabel(config, column.key, formatValue(viewing[column.key], column.format))}</dd></div>)}

@@ -28,6 +28,8 @@ export function createDemoDataset(): ManagementDataset {
     return { ...source, id: i + 1, code: `KH-${pad(i + 1)}`, name: names[(i + 3) % names.length],
       phone: phone(i + 101), email: `khachhang${i + 1}@example.test`, id_card: `DEMO-${String(i + 1).padStart(6, '0')}`,
       address: `Địa chỉ mẫu ${i + 1}, Hà Nội`, status: i % 9 === 8 ? 'warning' : 'active',
+      birthday: '1995-05-20', id_card_issued_on: '2024-01-15', id_card_issued_by: 'Nơi cấp mẫu',
+      relatives_text: 'Người thân mẫu · 0900000099',
       warning_note: i % 9 === 8 ? 'Ghi chú mẫu: cần kiểm tra thông tin liên hệ.' : '',
       created_at: '2026-09-01' };
   });

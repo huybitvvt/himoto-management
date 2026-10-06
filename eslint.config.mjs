@@ -21,7 +21,7 @@ export default [
     },
   },
   {
-    files: ['src/components/management/**/*.{ts,tsx}', 'src/lib/management/**/*.ts', 'src/app/(management)/**/*.tsx', 'src/fixtures/management-data.ts'],
+    files: ['src/components/management/**/*.{ts,tsx}', 'src/components/contracts/**/*.{ts,tsx}', 'src/lib/management/**/*.ts', 'src/app/(management)/**/*.tsx', 'src/fixtures/management-data.ts'],
     rules: { '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }] },
   },
 ];

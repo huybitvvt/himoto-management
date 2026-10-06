@@ -128,7 +128,8 @@ with sync_playwright() as p:
         expect(page.locator('.mg-table tbody tr')).to_have_count(2)
         page.get_by_role('button', name='Xóa bộ lọc', exact=True).click()
         expect(page.locator('.mg-table tbody tr')).to_have_count(10)
-        assert page.locator('.mg-heading-actions button').count() == 1
+        assert page.locator('.mg-heading-actions button').count() == 2
+        expect(page.get_by_role('button', name='Điền và in hợp đồng', exact=True)).to_be_visible()
         assert page.locator('.mg-row-actions button[aria-label^="Sửa"]').count() == 0
         page.get_by_role('button', name='Xem HD-2610-001', exact=True).click()
         expect(page.get_by_role('dialog')).to_be_visible()

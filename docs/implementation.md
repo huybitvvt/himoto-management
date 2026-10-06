@@ -2,7 +2,7 @@
 
 Phạm vi: Next.js frontend cho `/staff`, `/customers`, `/contracts`, `/stores`, `/vehicles`. Trang `/` dẫn đến danh sách xe. Mỗi danh sách dùng cùng component bảng, tìm kiếm không dấu, bộ lọc, sắp xếp, phân trang 10/20/50 dòng, ẩn/hiện cột và xuất CSV thật theo kết quả đã lọc.
 
-Module đơn thuê xe, API NestJS và database không được sửa. Hợp đồng không có form tạo/sửa, thu tiền, giao xe, gia hạn, trả xe hoặc tất toán. Component `RentalDetailModal` hiện có được dùng lại để đọc chi tiết; nút in của component được ẩn trong phạm vi giao diện quản lý. Module cũ chưa hỗ trợ deep link tới một đơn cụ thể, nên liên kết mở danh sách đơn thuê xe hiện có.
+Module đơn thuê xe, API NestJS và database không được sửa. Danh sách hợp đồng không ghi dữ liệu. Theo phạm vi bổ sung, màn này có modal điền thông tin và in nháp, dùng lại toàn bộ mẫu `ContractPrintDocument.vue` cũ dưới dạng React. Không tạo đơn, thu tiền, giao xe, gia hạn, trả xe hoặc tất toán. Component `RentalDetailModal` hiện có được dùng lại để đọc chi tiết. Module cũ chưa hỗ trợ deep link tới một đơn cụ thể, nên liên kết mở danh sách đơn thuê xe hiện có. Xem [auto-fill và mẫu in](contract-autofill.md).
 
 ## Chạy và kiểm tra
 
@@ -28,7 +28,7 @@ Hai script dùng Python Playwright và Chromium (`pip install playwright` và `p
 ## Dữ liệu và khả năng kết nối
 
 - Mặc định là demo: danh tính, giấy tờ, liên hệ, địa chỉ và biển số được tạo giả; email dùng miền `example.test`. Dữ liệu không lưu vào database hoặc localStorage. Thêm/sửa được giữ khi chuyển giữa năm màn, mất khi tải lại trang. Menu người dùng có khôi phục dữ liệu mẫu.
-- Provider nhận `ManagementRepository`; adapter demo và adapter HTTP tách biệt. Không fallback sang mẫu nếu API lỗi. API hiện chỉ đọc; các form được ẩn khi bật nguồn API.
+- Provider nhận `ManagementRepository`; adapter demo và adapter HTTP tách biệt. Không fallback sang mẫu nếu API lỗi. CRUD danh mục hiện chỉ đọc khi bật nguồn API. Riêng modal tạo khách hàng từ auto-fill dùng `POST /auth/customers` đã có; không ghi hợp đồng.
 - Bật HTTP bằng `NEXT_PUBLIC_MANAGEMENT_DATA_SOURCE=api`; URL gốc dùng `NEXT_PUBLIC_API_URL`, mặc định `/api`. Cần phiên đăng nhập hợp lệ. API chưa được kiểm bằng dữ liệu vận hành thật.
 - Adapter đọc các trang API tới khi đủ dữ liệu trước khi lọc phía client. Giới hạn 1.000 trang; cần chuyển lọc/sắp xếp/phân trang sang server trước khi dùng dataset lớn.
 - `NEXT_PUBLIC_RENTAL_APP_URL` xác định nơi mở module đơn thuê xe. Ở repo gốc mặc định `/car-rental`; bản frontend độc lập trỏ tới ứng dụng đang chạy.
@@ -47,7 +47,7 @@ Hai script dùng Python Playwright và Chromium (`pip install playwright` và `p
 
 View xe giữ các mã PHP: `ready`, `using`, `repairing`, `pending`, `sold`, `bad_debt`, `broken`, `in_transit`. Alias Nest `rent`, `maintenance`, `holding` chỉ được ánh xạ ở frontend; không cập nhật DB. `electric` và loại tour trong fixture là giá trị minh họa cần xác nhận. Các mã hợp đồng số được hiển thị theo `ORDER_STATUS` của module cũ, giữ nguyên mã gốc.
 
-Không tự lấy `price_range` làm đơn giá, hoặc `pid` làm cọc. Không gộp nghiệp vụ thuê sở hữu vào hợp đồng thuê xe khi chưa thống nhất DTO. Không có POST/PUT/DELETE trong adapter HTTP của bản giao diện này.
+Không tự lấy `price_range` làm đơn giá, hoặc `pid` làm cọc. Không gộp nghiệp vụ thuê sở hữu vào hợp đồng thuê xe khi chưa thống nhất DTO. Adapter danh mục chỉ GET. Adapter auto-fill bổ sung GET khách theo CCCD, GET nhân sự theo cơ sở và POST tạo khách hàng; không có POST/PUT/DELETE cho đơn thuê xe.
 
 ## Repo và triển khai mới
 

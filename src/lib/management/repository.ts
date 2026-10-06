@@ -28,6 +28,13 @@ type ApiRow = Record<string, unknown>;
 const text = (value: unknown): string => value == null ? '' : String(value);
 const number = (value: unknown): number | undefined => value == null || value === '' || !Number.isFinite(Number(value)) ? undefined : Number(value);
 const object = (value: unknown): ApiRow => value && typeof value === 'object' && !Array.isArray(value) ? value as ApiRow : {};
+function relativesText(value: unknown): string {
+  let parsed = value;
+  if (typeof value === 'string') { try { parsed = JSON.parse(value); } catch { return value; } }
+  if (!Array.isArray(parsed)) return typeof parsed === 'string' ? parsed : '';
+  return parsed.map(object).filter(relative => relative.name || relative.phone).map(relative =>
+    `${text(relative.name)}${relative.relationship ? ` (${text(relative.relationship)})` : ''}${relative.phone ? `: ${text(relative.phone)}` : ''}`).join(' - Và: ');
+}
 
 export function mapApiRow(kind: ManagementKind, raw: ApiRow): ManagementRow {
   const id = number(raw.id);
@@ -43,8 +50,10 @@ export function mapApiRow(kind: ManagementKind, raw: ApiRow): ManagementRow {
   if (kind === 'stores') return { ...base, manager_name: text(raw.manager_name),
     vehicle_count: number(raw.vehicle_count), staff_count: number(raw.staff_count),
     status: ({ '1': 'active', '0': 'inactive' } as Record<string, string>)[base.status] || base.status };
-  if (kind === 'customers') return { ...base, id_card: text(raw.id_card), warning_note: text(raw.warning),
-    contract_count: number(raw.contract_count), status: raw.warning ? 'warning' :
+  if (kind === 'customers') return { ...base, id_card: text(raw.id_card || raw.identity_card), warning_note: text(raw.warning || raw.warning_note),
+    id_card_issued_on: text(raw.id_card_issued_on || raw.id_card_date), id_card_issued_by: text(raw.id_card_issued_by || raw.id_card_place),
+    birthday: text(raw.birthday || raw.date_of_birth), relatives_text: text(raw.relatives_text) || relativesText(raw.relatives),
+    contract_count: number(raw.contract_count), status: raw.warning || raw.warning_note ? 'warning' :
       (({ '1': 'active', '0': 'draft' } as Record<string, string>)[base.status] || base.status) };
   if (kind === 'vehicles') return { ...base, license: text(raw.license), brand: text(raw.brand), type: text(raw.type),
     odometer: number(raw.odometer), daily_price: number(raw.daily_price), monthly_price: number(raw.monthly_price), year: text(raw.year),
@@ -52,6 +61,7 @@ export function mapApiRow(kind: ManagementKind, raw: ApiRow): ManagementRow {
   const customer = object(raw.customer);
   const vehicles = Array.isArray(raw.vehicles) ? raw.vehicles.map(object) : [];
   return { ...base, code: text(raw.contract_number || raw.code) || `#${id}`, name: text(raw.contract_number || raw.code) || `#${id}`,
+    staff_id: number(raw.staff_id ?? raw.contract_responsible_user_id),
     customer_id: number(raw.customer_id), customer_name: text(raw.customer_name || customer.name),
     customer_phone: text(raw.customer_phone || customer.phone),
     vehicle_name: vehicles.map(v => text(v.name)).filter(Boolean).join(', '),

@@ -1,0 +1,152 @@
+'use client';
+
+import { FormEvent, useEffect, useRef, useState } from 'react';
+import { CheckCircle2, LoaderCircle, Plus, Printer, Search, Trash2, UserPlus } from 'lucide-react';
+import { Dialog } from '@/components/management/Dialog';
+import { useManagement } from '@/components/management/ManagementProvider';
+import { ContractDraft, CustomerDetails, LegacyContractDocument, buildContractDocument, createContractDraft, customerDetails, emptyVehicle, normalizeIdCard, staffIsAvailable, staffMatchesStore, validIdCard, validateContractDraft, vehicleDetails } from '@/lib/management/contract-document';
+import { ManagementRow } from '@/lib/management/types';
+import { CustomerCreateDialog } from './CustomerCreateDialog';
+import { ContractPrintPreview } from './ContractPrintPreview';
+
+type LookupState = 'idle' | 'loading' | 'found' | 'missing' | 'error';
+export function ContractComposer({ row, onClose }: { row?: ManagementRow | null; onClose: () => void }) {
+  const { dataset, selectedStore, source, contractAutofill } = useManagement();
+  const [draft, setDraft] = useState<ContractDraft>(() => createContractDraft(dataset!, selectedStore, row));
+  const [idInput, setIdInput] = useState(draft.customer.id_card);
+  const [lookupState, setLookupState] = useState<LookupState>('idle');
+  const [lookupError, setLookupError] = useState('');
+  const [lookupRetry, setLookupRetry] = useState(0);
+  const [staff, setStaff] = useState<ManagementRow[]>([]);
+  const [staffLoading, setStaffLoading] = useState(false);
+  const [staffError, setStaffError] = useState('');
+  const [staffRetry, setStaffRetry] = useState(0);
+  const [customerModal, setCustomerModal] = useState(false);
+  const [document, setDocument] = useState<LegacyContractDocument | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const form = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    const controller = new AbortController(); let current = true;
+    setStaff([]); setStaffError(''); setStaffLoading(Boolean(draft.store_id));
+    if (draft.store_id) void contractAutofill.loadStaff(draft.store_id, controller.signal).then(rows => {
+      if (current) { setStaff(staffMatchesStore(rows, draft.store_id)); setStaffLoading(false); }
+    }).catch(cause => { if (current) { setStaffError(cause instanceof Error ? cause.message : 'Không tải được nhân sự.'); setStaffLoading(false); } });
+    return () => { current = false; controller.abort(); };
+  }, [draft.store_id, contractAutofill, staffRetry]);
+  useEffect(() => {
+    if (customerModal) return;
+    const idCard = normalizeIdCard(idInput);
+    const controller = new AbortController(); let current = true;
+    setLookupError('');
+    if (!validIdCard(idCard, source)) { setLookupState('idle'); return; }
+    setLookupState('loading');
+    const timer = setTimeout(() => {
+      void contractAutofill.lookupCustomer(idCard, controller.signal).then(customer => {
+        if (!current) return;
+        if (!customer) { setLookupState('missing'); setDraft(previous => ({ ...previous, customer_id: null })); return; }
+        setLookupState('found');
+        setDraft(previous => ({ ...previous, customer_id: customer.id, customer: customerDetails(customer),
+          vehicles: previous.vehicles.map(vehicle => ({ ...vehicle, driver_name: vehicle.driver_name && vehicle.driver_name !== previous.customer.name ? vehicle.driver_name : customer.name })) }));
+      }).catch(cause => {
+        if (!current) return;
+        setLookupState('error'); setLookupError(cause instanceof Error ? cause.message : 'Không tra cứu được khách hàng.');
+        setDraft(previous => ({ ...previous, customer_id: null }));
+      });
+    }, 350);
+    return () => { current = false; clearTimeout(timer); controller.abort(); };
+  }, [idInput, source, contractAutofill, lookupRetry, customerModal]);
+
+  function change<K extends keyof ContractDraft>(key: K, value: ContractDraft[K]) {
+    setDraft(previous => ({ ...previous, [key]: value })); setErrors(previous => ({ ...previous, [key]: '' }));
+  }
+  function changeIdentity(value: string) {
+    setIdInput(value); setLookupState('idle'); setLookupError(''); setDocument(null);
+    setDraft(previous => ({ ...previous, customer_id: null, customer: { ...customerDetails(), id_card: normalizeIdCard(value) },
+      vehicles: previous.vehicles.map(vehicle => ({ ...vehicle, driver_name: '' })) }));
+    setErrors(previous => ({ ...previous, id_card: '' }));
+  }
+  function customerCreated(customer: ManagementRow) {
+    setDraft(previous => ({ ...previous, customer_id: customer.id, customer: customerDetails(customer), vehicles: previous.vehicles.map(vehicle => ({ ...vehicle, driver_name: customer.name })) }));
+    setIdInput(String(customer.id_card)); setLookupState('found'); setCustomerModal(false);
+  }
+  function preview(event: FormEvent) {
+    event.preventDefault();
+    if (!dataset) return;
+    const next = validateContractDraft(draft, dataset, staff, source);
+    if (lookupState !== 'found') next.id_card = 'Tra cứu hoặc tạo khách hàng trước khi in.';
+    setErrors(next);
+    if (Object.keys(next).length) { requestAnimationFrame(() => form.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()); return; }
+    const branch = dataset.stores.find(store => String(store.id) === draft.store_id)!;
+    const representative = staff.find(person => String(person.id) === draft.staff_id)!;
+    setDocument(buildContractDocument(draft, branch, representative));
+  }
+  const branchStaff = staffMatchesStore(staff, draft.store_id);
+  const branchVehicles = dataset?.vehicles.filter(vehicle => String(vehicle.store_id) === draft.store_id) || [];
+  const representative = branchStaff.find(person => String(person.id) === draft.staff_id);
+  const lookupText = lookupState === 'loading' ? 'Đang tra cứu khách hàng…' : lookupState === 'found' ? `Đã tìm thấy khách hàng #${draft.customer_id} · Thông tin đã tự động điền` : lookupState === 'missing' ? 'Chưa có khách hàng mang số giấy tờ này.' : source === 'demo' ? 'Dữ liệu mẫu: thử DEMO-000001 hoặc nhập CCCD 12 số / CMND 9 số.' : 'Nhập đủ CCCD 12 số / CMND 9 số để tự động tra cứu.';
+  function field(key: keyof Omit<ContractDraft, 'customer' | 'vehicles' | 'customer_id'>, label: string, type = 'text', required = false) {
+    return <div className="mg-field" key={key}><label htmlFor={`contract-${key}`}>{label}{required && <span aria-hidden="true"> *</span>}</label>
+      <input id={`contract-${key}`} name={key} type={type} value={String(draft[key])} required={required} min={type === 'number' ? 0 : undefined} step={type === 'number' ? 1 : undefined}
+        aria-invalid={Boolean(errors[key])} aria-describedby={errors[key] ? `contract-${key}-error` : undefined} onChange={event => change(key, event.target.value)} />
+      {errors[key] && <p id={`contract-${key}-error`} className="mg-field-error">{errors[key]}</p>}</div>;
+  }
+  const customerFields: { key: keyof CustomerDetails; label: string; type?: string; wide?: boolean }[] = [
+    { key: 'name', label: 'Họ và tên' }, { key: 'phone', label: 'Số điện thoại', type: 'tel' }, { key: 'email', label: 'Email', type: 'email' },
+    { key: 'birthday', label: 'Ngày sinh', type: 'date' }, { key: 'address', label: 'Địa chỉ', wide: true },
+    { key: 'id_card_issued_on', label: 'Ngày cấp giấy tờ', type: 'date' }, { key: 'id_card_issued_by', label: 'Nơi cấp giấy tờ' },
+    { key: 'relatives_text', label: 'Thông tin người thân', wide: true }, { key: 'warning_note', label: 'Ghi chú / cảnh báo', wide: true },
+  ];
+  return <>
+    <Dialog title="Điền và in hợp đồng" subtitle={row ? `${row.code} · Thông tin soạn cho mẫu in` : 'Bản nháp · Chưa cấp số hợp đồng'} className="mg-contract-composer" onClose={onClose}>
+      <form ref={form} noValidate onSubmit={preview}>
+        <div className="mg-dialog-body mg-composer-body">
+          <div className="mg-composer-notice">{source === 'demo' ? 'Đang dùng dữ liệu mẫu. Khách hàng mới chỉ lưu trong phiên xem trước.' : 'Tra cứu và tạo khách hàng qua hệ thống hiện có.'} Thông tin hợp đồng đang soạn dùng cho bản in nháp.</div>
+          <fieldset className="mg-composer-section"><legend><span>01</span>Cơ sở và nhân sự</legend><div className="mg-form-grid">
+            <div className="mg-field"><label htmlFor="contract-store">Cơ sở cho thuê *</label><select id="contract-store" value={draft.store_id} aria-invalid={Boolean(errors.store_id)} onChange={event => { change('store_id', event.target.value); change('staff_id', ''); change('vehicles', [emptyVehicle()]); change('unit_price', ''); }}>
+              <option value="">Chọn cơ sở</option>{dataset?.stores.map(store => <option key={store.id} value={store.id}>{store.name}</option>)}</select>{errors.store_id && <p className="mg-field-error">{errors.store_id}</p>}</div>
+            <div className="mg-field"><label htmlFor="contract-staff">Nhân sự phụ trách *</label><select id="contract-staff" value={draft.staff_id} disabled={!draft.store_id || staffLoading || Boolean(staffError)} aria-invalid={Boolean(errors.staff_id)} onChange={event => change('staff_id', event.target.value)}>
+              <option value="">{staffLoading ? 'Đang tải nhân sự…' : !draft.store_id ? 'Chọn cơ sở trước' : 'Chọn nhân sự tại cơ sở'}</option>{branchStaff.map(person => <option key={person.id} value={person.id} disabled={!staffIsAvailable(person)}>{person.name} · {person.code}{!staffIsAvailable(person) ? ' · Không làm việc' : ''}</option>)}</select>
+              {errors.staff_id && <p className="mg-field-error">{errors.staff_id}</p>}{staffError ? <div className="mg-field-error" role="alert">{staffError}<button className="mg-inline-button" type="button" onClick={() => setStaffRetry(value => value + 1)}>Thử lại</button></div> : <small role="status">{draft.store_id && !staffLoading ? `${branchStaff.filter(staffIsAvailable).length} nhân sự đang làm việc tại cơ sở` : 'Danh sách nhân sự sẽ lọc theo cơ sở đã chọn.'}</small>}</div>
+            {representative && <div className="mg-composer-person mg-field-wide"><CheckCircle2 size={17} /><span>Đại diện bên A: <strong>{representative.name}</strong> · {representative.position || '—'}</span></div>}
+          </div></fieldset>
+          <fieldset className="mg-composer-section"><legend><span>02</span>Thông tin khách hàng</legend>
+            <div className="mg-field"><label htmlFor="contract-id-card">CCCD / CMND *</label><div className="mg-lookup-controls"><input id="contract-id-card" autoComplete="off" value={idInput} aria-invalid={Boolean(errors.id_card)} aria-describedby="contract-lookup-status" placeholder={source === 'demo' ? 'DEMO-000001 hoặc số giấy tờ' : '9 hoặc 12 chữ số'} onChange={event => changeIdentity(event.target.value)} />
+              <button className="mg-button" type="button" disabled={!validIdCard(idInput, source) || lookupState === 'loading'} onClick={() => setLookupRetry(value => value + 1)}>{lookupState === 'loading' ? <LoaderCircle size={16} className="mg-spin" /> : <Search size={16} />}Tra cứu</button></div>
+              <div id="contract-lookup-status" className={`mg-lookup-status is-${lookupState}`} role={lookupState === 'error' ? 'alert' : 'status'}>{lookupState === 'error' ? lookupError : lookupText}</div>
+              {errors.id_card && <p className="mg-field-error">{errors.id_card}</p>}
+              {lookupState === 'missing' && <button className="mg-button mg-button-primary mg-create-customer-inline" type="button" onClick={() => setCustomerModal(true)}><UserPlus size={16} />Thêm khách hàng tại đây</button>}
+            </div>
+            <div className="mg-form-grid mg-customer-autofill">{customerFields.map(item => <div className={`mg-field ${item.wide ? 'mg-field-wide' : ''}`} key={item.key}><label htmlFor={`contract-customer-${item.key}`}>{item.label}</label><input id={`contract-customer-${item.key}`} type={item.type || 'text'} value={draft.customer[item.key]} disabled={lookupState !== 'found'} aria-invalid={Boolean(errors[item.key])} onChange={event => {
+              setDraft(previous => ({ ...previous, customer: { ...previous.customer, [item.key]: event.target.value } })); setErrors(previous => ({ ...previous, [item.key]: '' }));
+            }} />{errors[item.key] && <p className="mg-field-error">{errors[item.key]}</p>}</div>)}</div>
+            <p className="mg-composer-hint">Thông tin chỉnh tại đây dùng trên bản in, không cập nhật hồ sơ khách hàng đã có.</p>
+          </fieldset>
+          <fieldset className="mg-composer-section"><legend><span>03</span>Xe và thời gian thuê</legend>
+            <div className="mg-form-grid">{field('signed_on', 'Ngày ký', 'date', true)}{field('contract_number', 'Số hợp đồng (nếu đã cấp)')}{field('start_date', 'Thời gian bắt đầu', 'datetime-local', true)}{field('end_date', 'Thời gian hẹn trả', 'datetime-local', true)}</div>
+            {draft.vehicles.map((vehicle, index) => <div key={index} className="mg-composer-vehicle"><div className="mg-composer-vehicle-header"><strong>Xe {index + 1}</strong>{draft.vehicles.length > 1 && <button className="mg-icon-button" type="button" aria-label={`Bỏ xe ${index + 1}`} onClick={() => change('vehicles', draft.vehicles.filter((_, i) => i !== index))}><Trash2 size={16} /></button>}</div>
+              <div className="mg-field"><label htmlFor={`contract-vehicle-${index}`}>Xe tại cơ sở *</label><select id={`contract-vehicle-${index}`} disabled={!draft.store_id} value={vehicle.id} aria-invalid={Boolean(errors[`vehicle_${index}`])} onChange={event => {
+                const selected = branchVehicles.find(item => String(item.id) === event.target.value);
+                change('vehicles', draft.vehicles.map((item, i) => i === index ? selected ? vehicleDetails(selected, draft.customer) : emptyVehicle() : item));
+                if (selected && !draft.unit_price && index === 0) change('unit_price', String(selected.daily_price ?? ''));
+              }}><option value="">Chọn xe</option>{branchVehicles.map(item => <option key={item.id} value={item.id}>{item.name} · {item.license}</option>)}</select>{errors[`vehicle_${index}`] && <p className="mg-field-error">{errors[`vehicle_${index}`]}</p>}</div>
+              {vehicle.id && <div className="mg-composer-vehicle-summary">{vehicle.license} · {vehicle.brand} · {vehicle.type_text} · {vehicle.year || 'Chưa có năm sản xuất'}</div>}
+              <div className="mg-form-grid">{(['color', 'driver_name', 'driver_license_number', 'driver_license_issued_on', 'borrow_hats', 'borrow_raincoats'] as const).map(key => {
+                const labels = { color: 'Màu xe', driver_name: 'Tên người lái', driver_license_number: 'Số GPLX', driver_license_issued_on: 'Ngày cấp GPLX', borrow_hats: 'Số mũ bảo hiểm', borrow_raincoats: 'Số áo mưa' };
+                return <div className="mg-field" key={key}><label htmlFor={`contract-vehicle-${index}-${key}`}>{labels[key]}</label><input id={`contract-vehicle-${index}-${key}`} type={key === 'driver_license_issued_on' ? 'date' : key.startsWith('borrow_') ? 'number' : 'text'} min={key.startsWith('borrow_') ? 0 : undefined} value={vehicle[key]} aria-invalid={Boolean(errors[`vehicle_${index}_${key}`])} onChange={event => change('vehicles', draft.vehicles.map((item, i) => i === index ? { ...item, [key]: event.target.value } : item))} />{errors[`vehicle_${index}_${key}`] && <p className="mg-field-error">{errors[`vehicle_${index}_${key}`]}</p>}</div>;
+              })}</div>
+            </div>)}
+            <button className="mg-button" type="button" disabled={!draft.store_id} onClick={() => change('vehicles', [...draft.vehicles, emptyVehicle()])}><Plus size={16} />Thêm xe vào mẫu</button>
+          </fieldset>
+          <fieldset className="mg-composer-section"><legend><span>04</span>Thông tin trên mẫu in</legend><div className="mg-form-grid">
+            {field('package_name', 'Gói thuê')}{field('unit_price', 'Đơn giá thuê (VNĐ)', 'number')}{field('total_amount', 'Tổng tiền thuê (VNĐ)', 'number')}{field('paid_amount', 'Số tiền đã thanh toán (VNĐ)', 'number')}
+            {field('payment_method', 'Hình thức thanh toán ghi trên mẫu')}{field('deposit_amount', 'Số tiền cọc ghi trên mẫu (VNĐ)', 'number')}{field('deposit_payment_method', 'Hình thức cọc ghi trên mẫu')}{field('collateral_description', 'Tài sản thế chấp')}
+            {field('authorization_date', 'Ngày ủy quyền', 'date')}{field('customer_source', 'Nguồn khách')}{field('customer_source_url', 'Liên kết nguồn khách', 'url')}
+          </div><p className="mg-composer-hint">Các số tiền là thông tin trên mẫu in. Không phát sinh giao dịch thu tiền hay nhận cọc.</p></fieldset>
+        </div>
+        <div className="mg-dialog-footer"><span className="mg-form-note">* Thông tin bắt buộc</span><button type="button" className="mg-button" onClick={onClose}>Đóng</button><button type="submit" className="mg-button mg-button-primary" disabled={staffLoading || lookupState === 'loading'}><Printer size={16} />Xem mẫu in</button></div>
+      </form>
+    </Dialog>
+    {customerModal && <CustomerCreateDialog idCard={normalizeIdCard(idInput)} onCreated={customerCreated} onClose={() => setCustomerModal(false)} />}
+    {document && <ContractPrintPreview doc={document} onClose={() => setDocument(null)} />}
+  </>;
+}

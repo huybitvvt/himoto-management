@@ -3,7 +3,7 @@
 - Repo private: https://github.com/huybitvvt/himoto-management
 - Production: https://himoto-management.vercel.app
 - Vercel project: `huybitvvts-projects/himoto-management`, kết nối repo GitHub, nhánh `main`.
-- Source frontend đã triển khai: commit `8b567b9`.
+- Source frontend khi triển khai lần đầu: commit `8b567b9`.
 - Mã cục bộ: `E:\himoto-management`.
 
 ## Kiểm chứng
@@ -19,5 +19,7 @@ Kết quả trực tiếp trên Vercel: [tương tác](qa/vercel/functional-resu
 Dữ liệu giả, thao tác thêm/sửa chỉ giữ trong phiên và mất khi tải lại. Chưa kết nối API hoặc database thật. Adapter GET đã chuẩn bị; xác nhận DTO, đăng nhập, quyền và URL API là bước tích hợp sau.
 
 Danh sách hợp đồng chỉ đọc, dùng lại renderer chi tiết hiện có; liên kết mở module đơn thuê xe đang chạy. Không triển khai luồng tạo đơn, nhận cọc, giao xe, gia hạn, trả xe, thanh toán hoặc tất toán.
+
+Bản cập nhật thêm modal **Điền và in hợp đồng**, auto-fill nhân sự theo cơ sở/khách theo CCCD, popup tạo khách và mẫu in cũ A4 ngang. Chi tiết và kiểm chứng: [auto-fill/in](contract-autofill.md). Các hợp đồng soạn tại đây là bản in nháp; không tạo đơn hoặc ghi giao dịch thuê xe.
 
 Repo gốc giữ remote `https://github.com/huybitvvt/duanthuexe.git`; không đẩy thay đổi lên repo đó. Không sửa module đơn thuê xe, API hoặc database của repo gốc.

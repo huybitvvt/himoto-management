@@ -1,8 +1,11 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, useMemo, ReactNode } from 'react';
 import { createManagementRepository } from '@/lib/management/repository';
 import { EditableKind, ManagementDataset, ManagementRepository, ManagementRow } from '@/lib/management/types';
+import { ContractAutofillRepository, createApiAutofillRepository, createDemoAutofillRepository } from '@/lib/management/contract-autofill';
+import { CustomerDetails } from '@/lib/management/contract-document';
+import { reconcileDataset } from '@/fixtures/management-data';
 
 interface ManagementContextValue {
   dataset: ManagementDataset | null;
@@ -15,11 +18,14 @@ interface ManagementContextValue {
   reset: () => Promise<void>;
   save: (kind: EditableKind, row: ManagementRow) => Promise<void>;
   notify: (message: string) => void;
+  contractAutofill: ContractAutofillRepository;
+  createCustomer: (customer: CustomerDetails) => Promise<ManagementRow>;
 }
 const ManagementContext = createContext<ManagementContextValue | null>(null);
 
 export function ManagementProvider({ children }: { children: ReactNode }) {
   const [repository] = useState<ManagementRepository>(createManagementRepository);
+  const contractAutofill = useMemo(() => repository.source === 'api' ? createApiAutofillRepository(process.env.NEXT_PUBLIC_API_URL || '/api') : createDemoAutofillRepository(repository), [repository]);
   const [dataset, setDataset] = useState<ManagementDataset | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -47,7 +53,17 @@ export function ManagementProvider({ children }: { children: ReactNode }) {
     setDataset(await repository.reset()); selectStore('all');
     notify('Đã khôi phục dữ liệu mẫu ban đầu.');
   };
-  return <ManagementContext.Provider value={{ dataset, loading, error, source: repository.source, selectedStore, selectStore, reload, reset, save, notify }}>
+  const createCustomer = async (customer: CustomerDetails) => {
+    const row = await contractAutofill.createCustomer(customer);
+    setDataset(current => {
+      if (!current) return current;
+      const next = { ...current, customers: [row, ...current.customers.filter(item => item.id !== row.id)] };
+      return repository.source === 'demo' ? reconcileDataset(next) : next;
+    });
+    notify(repository.source === 'demo' ? 'Đã thêm khách hàng mẫu và điền vào hợp đồng. Chỉ lưu trong phiên xem trước.' : 'Đã tạo khách hàng và điền vào hợp đồng.');
+    return row;
+  };
+  return <ManagementContext.Provider value={{ dataset, loading, error, source: repository.source, selectedStore, selectStore, reload, reset, save, notify, contractAutofill, createCustomer }}>
     {children}
     {notification && <div className="mg-toast" role="status"><span>{notification}</span><button type="button" onClick={() => notify('')} aria-label="Đóng thông báo">×</button></div>}
   </ManagementContext.Provider>;
