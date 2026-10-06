@@ -1,4 +1,4 @@
-/* Scoped to the five management screens; rental and other legacy screens keep their styling. */
+/* Scoped to the management shell and its screens. */
 .mg-app {
   --mg-ink: #202833; --mg-muted: #68717e; --mg-line: #e8ebef;
   --mg-gold: #e5a800; --mg-gold-soft: #fff6da; --mg-page: #f7f8fa;
@@ -302,6 +302,49 @@
 .mg-contract-actions { flex-wrap: wrap; max-width: 144px; margin: auto; }
 .mg-clone-button { flex-basis: 100%; font-size: 12px; gap: 5px; padding: 6px; min-height: 30px; }
 .mg-composer-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.mg-cashbook-filters { margin-bottom: 18px; }
+.mg-cashbook-select-label { display: flex; align-items: center; gap: 9px; font-size: 12px; color: #53606e; }
+.mg-cashbook-filters .mg-search { max-width: 480px; }
+.mg-cashbook-filters .mg-date-filters label { display: inline-flex; align-items: center; gap: 7px; }
+.mg-cashbook-overview { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 22px; }
+.mg-cashbook-overview a { display: flex; align-items: center; gap: 11px; min-height: 66px; padding: 14px 20px; border: 1px solid #e4e8ed; border-radius: 10px; background: #fff; font-size: 13px; }
+.mg-cashbook-overview a:hover { border-color: #c5ccd5; background: #fcfcfd; }
+.mg-cashbook-overview strong { font-size: 22px; font-variant-numeric: tabular-nums; font-weight: 650; margin-left: auto; }
+.mg-cashbook-jump { font-size: 11px; color: #68717e; }
+.mg-cashbook-count-marker { width: 7px; height: 7px; border-radius: 50%; background: #087450; flex-shrink: 0; }
+.mg-cashbook-count-marker.is-expense { background: #bc3037; }
+.mg-cashbook-tables { display: grid; gap: 24px; }
+.mg-cashbook-panel { scroll-margin-top: 20px; }
+.mg-cashbook-panel-heading { display: flex; align-items: center; gap: 12px; padding: 18px 20px; border-bottom: 1px solid var(--mg-line); }
+.mg-cashbook-symbol { width: 37px; height: 37px; display: grid; place-items: center; border-radius: 9px; background: #edf7f2; color: #087450; flex-shrink: 0; }
+.mg-cashbook-symbol.is-expense { background: #fdf0f1; color: #bc3037; }
+.mg-cashbook-panel-heading h2 { display: flex; align-items: center; gap: 9px; margin: 0; font-size: 17px; color: #202833; font-weight: 650; }
+.mg-cashbook-panel-heading p { font-size: 11px; color: #68717e; margin: 4px 0 0; }
+.mg-cashbook-mobile-hint { display: none; }
+.mg-cashbook-panel-description { margin-left: auto; font-size: 11px; color: #68717e; }
+.mg-cashbook-table { min-width: 1010px; table-layout: fixed; }
+.mg-cashbook-table th:nth-child(1) { width: 135px; }
+.mg-cashbook-table th:nth-child(2) { width: 105px; }
+.mg-cashbook-table th:nth-child(3) { width: 90px; }
+.mg-cashbook-table th:nth-child(4) { width: 110px; }
+.mg-cashbook-table th:nth-child(5) { width: 155px; }
+.mg-cashbook-table th:nth-child(6) { width: 165px; }
+.mg-cashbook-table th:nth-child(7) { width: 250px; }
+.mg-cashbook-table td { vertical-align: top; }
+.mg-cashbook-cell { display: block; line-height: 1.65; white-space: normal; overflow-wrap: anywhere; }
+.mg-cashbook-date, .mg-cashbook-time { white-space: nowrap; font-variant-numeric: tabular-nums; }
+@media (max-width: 1200px) { .mg-cashbook-mobile-hint { display: block; } }
+@media (max-width: 600px) {
+  .mg-cashbook-overview { gap: 10px; }
+  .mg-cashbook-overview a { padding: 12px; gap: 7px; flex-wrap: wrap; }
+  .mg-cashbook-overview strong { font-size: 19px; }
+  .mg-cashbook-jump { width: 100%; }
+  .mg-cashbook-select-label { width: 100%; flex-wrap: wrap; }
+  .mg-cashbook-filters .mg-filter-controls, .mg-cashbook-filters select { width: 100%; max-width: none; }
+  .mg-cashbook-panel-description { display: none; }
+  .mg-cashbook-page .mg-icon-button, .mg-cashbook-page .mg-sort { min-height: 44px; min-width: 44px; }
+  .mg-cashbook-page .mg-button, .mg-cashbook-page .mg-search, .mg-cashbook-page select, .mg-cashbook-page input[type=date] { min-height: 44px; }
+}
 .mg-contract-print-dialog { width: 1200px; }
 .mg-contract-print-toolbar { padding: 15px 24px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .mg-contract-print-toolbar p { font-size: 12px; color: #607085; margin: 0; }

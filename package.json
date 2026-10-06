@@ -12,6 +12,7 @@
     "test:management": "node scripts/check-management-data.cjs",
     "test:contracts": "node scripts/check-contract-autofill.cjs",
     "test:clone": "node scripts/check-contract-clone.cjs",
+    "test:cashbook": "node scripts/check-cashbook-data.cjs",
     "lint:management": "eslint \"src/components/management/**/*.{ts,tsx}\" \"src/components/contracts/**/*.{ts,tsx}\" \"src/lib/management/**/*.ts\" \"src/app/(management)/**/*.tsx\" src/fixtures/management-data.ts"
   },
   "dependencies": {

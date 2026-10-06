@@ -1,6 +1,8 @@
-# HIMOTO — năm màn quản lý dạng bảng
+# HIMOTO — giao diện quản lý dạng bảng
 
 Phạm vi: Next.js frontend cho `/staff`, `/customers`, `/contracts`, `/stores`, `/vehicles`. Trang `/` dẫn đến danh sách xe. Mỗi danh sách dùng cùng component bảng, tìm kiếm không dấu, bộ lọc, sắp xếp, phân trang 10/20/50 dòng, ẩn/hiện cột và xuất CSV thật theo kết quả đã lọc.
+
+Màn bổ sung `/cashbook` là **Sổ quỹ / Sổ két**, gồm hai bảng Phiếu thu/Phiếu chi dùng cùng cấu trúc bảy cột, bộ lọc chung và phân trang độc lập. Adapter chỉ đọc giao dịch tài chính hiện có, không ghi API/database. Xem [chi tiết sổ quỹ](cashbook.md).
 
 Module đơn thuê xe, API NestJS và database không được sửa. Theo phạm vi bổ sung, hợp đồng có modal điền/in nháp, sao chép thành bản ghi mới và lưu chỉnh sửa trong phiên demo. Mẫu `ContractPrintDocument.vue` cũ được dùng lại dưới dạng React. Không tạo đơn thuê xe thật, thu tiền, giao xe, gia hạn, trả xe hoặc tất toán. Component `RentalDetailModal` hiện có được dùng lại để đọc chi tiết. Module cũ chưa hỗ trợ deep link tới một đơn cụ thể, nên liên kết mở danh sách đơn thuê xe hiện có. Xem [auto-fill và mẫu in](contract-autofill.md), [sao chép hợp đồng](contract-clone.md).
 

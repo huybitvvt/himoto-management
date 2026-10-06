@@ -3,7 +3,7 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ArrowUpRight, Bike, Building2, ChevronDown, ChevronRight, ContactRound, Files, Menu, PanelLeftClose, RotateCcw, UsersRound, X } from 'lucide-react';
+import { ArrowUpRight, Bike, Building2, ChevronDown, ChevronRight, ContactRound, Files, Menu, PanelLeftClose, RotateCcw, UsersRound, Wallet, X } from 'lucide-react';
 import { ManagementProvider, useManagement } from './ManagementProvider';
 import { Dialog, trapFocusWithin } from './Dialog';
 import { rentalModuleUrl } from '@/lib/management/links';
@@ -14,6 +14,7 @@ const navigation = [
   { href: '/contracts', label: 'Danh sách hợp đồng', kind: 'contracts' as const, icon: Files },
   { href: '/stores', label: 'Cơ sở', kind: 'stores' as const, icon: Building2 },
   { href: '/vehicles', label: 'Danh sách xe', kind: 'vehicles' as const, icon: Bike },
+  { href: '/cashbook', label: 'Sổ quỹ / Sổ két', kind: 'cashbook' as const, icon: Wallet },
 ];
 
 function Shell({ children }: { children: ReactNode }) {
@@ -74,7 +75,7 @@ function Shell({ children }: { children: ReactNode }) {
           <option value="all">Tất cả cơ sở</option>{dataset?.stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
           <span className={`mg-source-badge ${source === 'api' ? 'is-api' : ''}`}>{source === 'demo' ? 'Dữ liệu mẫu' : 'Chỉ đọc'}</span>
           <details className="mg-user-menu" ref={menuRef}><summary aria-label="Menu người dùng"><span className="mg-user-avatar">QT</span><div><strong>Quản trị viên</strong><small>{source === 'demo' ? 'Tài khoản mẫu' : 'Phiên tra cứu'}</small></div><ChevronDown size={14} /></summary>
-            <div className="mg-popover"><strong>{source === 'demo' ? 'Phiên xem trước giao diện' : 'Phiên tra cứu API'}</strong><p>{source === 'demo' ? 'Thay đổi dữ liệu mẫu được giữ khi chuyển giữa năm màn và mất khi tải lại trang.' : 'Thao tác ghi dữ liệu chưa được tích hợp.'}</p>
+            <div className="mg-popover"><strong>{source === 'demo' ? 'Phiên xem trước giao diện' : 'Phiên tra cứu API'}</strong><p>{source === 'demo' ? 'Thay đổi dữ liệu mẫu được giữ khi chuyển giữa các màn và mất khi tải lại trang.' : 'Thao tác ghi dữ liệu chưa được tích hợp.'}</p>
               {source === 'demo' && <button type="button" onClick={() => { if (menuRef.current) menuRef.current.open = false; setResetOpen(true); }}><RotateCcw size={16} />Khôi phục dữ liệu mẫu</button>}
               <Link href={rentalModuleUrl}><ArrowUpRight size={16} />Mở module đơn thuê xe</Link></div></details>
         </div>
