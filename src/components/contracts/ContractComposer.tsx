@@ -4,13 +4,13 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import { CheckCircle2, LoaderCircle, Plus, Printer, Save, Search, Trash2, UserPlus } from 'lucide-react';
 import { Dialog } from '@/components/management/Dialog';
 import { useManagement } from '@/components/management/ManagementProvider';
-import { ContractDraft, CustomerDetails, LegacyContractDocument, buildContractDocument, createContractDraft, customerDetails, emptyVehicle, normalizeIdCard, staffIsAvailable, staffMatchesStore, validIdCard, validateContractDraft, vehicleDetails } from '@/lib/management/contract-document';
+import { ContractDraft, CustomerDetails, LegacyContractDocument, buildContractDocument, createContractDraft, customerDetails, emptyVehicle, normalizeIdCard, staffIsAvailable, staffMatchesStore, validateContractDraft, vehicleDetails } from '@/lib/management/contract-document';
 import { ManagementRow } from '@/lib/management/types';
 import { CONTRACT_STATUSES, CONTRACT_TYPES } from '@/lib/management/config';
 import { CustomerCreateDialog } from './CustomerCreateDialog';
 import { ContractPrintPreview } from './ContractPrintPreview';
 
-type LookupState = 'idle' | 'loading' | 'found' | 'missing' | 'error';
+type LookupState = 'idle' | 'loading' | 'found' | 'matches' | 'missing' | 'error';
 export function ContractComposer({ row, mode = 'print', onClose }: { row?: ManagementRow | null; mode?: 'print' | 'edit'; onClose: () => void }) {
   const { dataset, selectedStore, source, contractAutofill, saveContract } = useManagement();
   const [draft, setDraft] = useState<ContractDraft>(() => createContractDraft(dataset!, selectedStore, row));
@@ -25,6 +25,7 @@ export function ContractComposer({ row, mode = 'print', onClose }: { row?: Manag
   const busy = useRef(false);
   const [lookupError, setLookupError] = useState('');
   const [lookupRetry, setLookupRetry] = useState(0);
+  const [customerMatches, setCustomerMatches] = useState<ManagementRow[]>([]);
   const [staff, setStaff] = useState<ManagementRow[]>([]);
   const [staffLoading, setStaffLoading] = useState(false);
   const [staffError, setStaffError] = useState('');
@@ -45,15 +46,23 @@ export function ContractComposer({ row, mode = 'print', onClose }: { row?: Manag
     if (customerModal) return;
     // Opening a copied/saved contract must not replace its snapshot with today's customer profile.
     if (preserveCustomer.current) return;
+    if (!draft.store_id) { setLookupState('idle'); setCustomerMatches([]); return; }
     const idCard = normalizeIdCard(idInput);
     const controller = new AbortController(); let current = true;
     setLookupError('');
-    if (!validIdCard(idCard, source)) { setLookupState('idle'); return; }
+    const demoCode = source === 'demo' && /^DEMO-[A-Z0-9-]+$/i.test(idCard);
+    const lookupDigits = idInput.replace(/\D/g, '');
+    if (!demoCode && (lookupDigits.length < 9 || lookupDigits.length > 13)) { setLookupState('idle'); setCustomerMatches([]); return; }
     setLookupState('loading');
     const timer = setTimeout(() => {
-      void contractAutofill.lookupCustomer(idCard, controller.signal).then(customer => {
+      const lookup = demoCode ? contractAutofill.lookupCustomer(idCard, controller.signal).then(customer => customer && String(customer.store_id) === draft.store_id ? [customer] : [])
+        : contractAutofill.searchCustomers(lookupDigits, draft.store_id, controller.signal);
+      void lookup.then(customers => {
         if (!current) return;
-        if (!customer) { setLookupState('missing'); setDraft(previous => ({ ...previous, customer_id: null })); return; }
+        setCustomerMatches(customers);
+        if (!customers.length) { setLookupState('missing'); setDraft(previous => ({ ...previous, customer_id: null })); return; }
+        if (customers.length > 1) { setLookupState('matches'); return; }
+        const customer = customers[0];
         setLookupState('found');
         setDraft(previous => ({ ...previous, customer_id: customer.id, customer: customerDetails(customer),
           vehicles: previous.vehicles.map(vehicle => ({ ...vehicle, driver_name: vehicle.driver_name && vehicle.driver_name !== previous.customer.name ? vehicle.driver_name : customer.name })) }));
@@ -64,7 +73,7 @@ export function ContractComposer({ row, mode = 'print', onClose }: { row?: Manag
       });
     }, 350);
     return () => { current = false; clearTimeout(timer); controller.abort(); };
-  }, [idInput, source, contractAutofill, lookupRetry, customerModal]);
+  }, [idInput, source, draft.store_id, contractAutofill, lookupRetry, customerModal]);
 
   function change<K extends keyof ContractDraft>(key: K, value: ContractDraft[K]) {
     setDraft(previous => ({ ...previous, [key]: value })); setErrors(previous => ({ ...previous, [key]: '' }));
@@ -72,14 +81,28 @@ export function ContractComposer({ row, mode = 'print', onClose }: { row?: Manag
   function changeIdentity(value: string) {
     preserveCustomer.current = false;
     setIdInput(value); setLookupState('idle'); setLookupError(''); setDocument(null);
-    setDraft(previous => ({ ...previous, customer_id: null, customer: { ...customerDetails(), id_card: normalizeIdCard(value) },
+    setCustomerMatches([]);
+    const normalized = normalizeIdCard(value);
+    const idCard = /^\d{9}$|^\d{12}$/.test(normalized) ? normalized : '';
+    setDraft(previous => ({ ...previous, customer_id: null, customer: { ...customerDetails(), id_card: idCard },
       vehicles: previous.vehicles.map(vehicle => ({ ...vehicle, driver_name: '' })) }));
     setErrors(previous => ({ ...previous, id_card: '' }));
+  }
+  function selectCustomer(customer: ManagementRow) {
+    preserveCustomer.current = true;
+    setCustomerMatches([]); setLookupState('found'); setLookupError('');
+    setDraft(previous => ({ ...previous, customer_id: customer.id, customer: customerDetails(customer),
+      vehicles: previous.vehicles.map(vehicle => ({ ...vehicle, driver_name: vehicle.driver_name && vehicle.driver_name !== previous.customer.name ? vehicle.driver_name : customer.name })) }));
   }
   function customerCreated(customer: ManagementRow) {
     preserveCustomer.current = true;
     setDraft(previous => ({ ...previous, customer_id: customer.id, customer: customerDetails(customer), vehicles: previous.vehicles.map(vehicle => ({ ...vehicle, driver_name: customer.name })) }));
     setIdInput(String(customer.id_card)); setLookupState('found'); setCustomerModal(false);
+  }
+  function openCustomerCreate() {
+    preserveCustomer.current = false;
+    if (lookupState === 'found') changeIdentity('');
+    setCustomerModal(true);
   }
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -89,7 +112,11 @@ export function ContractComposer({ row, mode = 'print', onClose }: { row?: Manag
     const next = validateContractDraft(draft, dataset, staff, source);
     if (lookupState !== 'found') next.id_card = 'Tra cứu hoặc tạo khách hàng trước khi lưu / in.';
     setErrors(next); setSaveError('');
-    if (Object.keys(next).length) { requestAnimationFrame(() => form.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()); return; }
+    if (Object.keys(next).length) {
+      const details = [...new Set(Object.values(next).filter(Boolean))].slice(0, 3).join(' ');
+      setSaveError(`Chưa thể ${savingRecord ? 'lưu hợp đồng' : 'tạo bản in'}. ${details}`);
+      requestAnimationFrame(() => form.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()); return;
+    }
     if (savingRecord && row) {
       busy.current = true; setSaving(true);
       try { await saveContract(row.id, { draft, status, rental_type: rentalType, notes }); onClose(); }
@@ -97,14 +124,20 @@ export function ContractComposer({ row, mode = 'print', onClose }: { row?: Manag
       finally { busy.current = false; setSaving(false); }
       return;
     }
-    const branch = dataset.stores.find(store => String(store.id) === draft.store_id)!;
-    const representative = staff.find(person => String(person.id) === draft.staff_id)!;
-    setDocument(buildContractDocument(draft, branch, representative));
+    try {
+      const branch = dataset.stores.find(store => String(store.id) === draft.store_id);
+      const representative = staff.find(person => String(person.id) === draft.staff_id);
+      if (!branch || !representative) throw new Error('Không tìm thấy cơ sở hoặc nhân sự phụ trách. Hãy chọn lại thông tin rồi thử lại.');
+      setDocument(buildContractDocument(draft, branch, representative));
+    } catch (cause) {
+      setSaveError(cause instanceof Error ? `Không tạo được mẫu hợp đồng: ${cause.message}` : 'Không tạo được mẫu hợp đồng. Vui lòng kiểm tra thông tin và thử lại.');
+    }
   }
   const branchStaff = staffMatchesStore(staff, draft.store_id);
   const branchVehicles = dataset?.vehicles.filter(vehicle => String(vehicle.store_id) === draft.store_id) || [];
   const representative = branchStaff.find(person => String(person.id) === draft.staff_id);
-  const lookupText = lookupState === 'loading' ? 'Đang tra cứu khách hàng…' : lookupState === 'found' ? `Đã tìm thấy khách hàng #${draft.customer_id} · Thông tin đã tự động điền` : lookupState === 'missing' ? 'Chưa có khách hàng mang số giấy tờ này.' : source === 'demo' ? 'Dữ liệu mẫu: thử DEMO-000001 hoặc nhập CCCD 12 số / CMND 9 số.' : 'Nhập đủ CCCD 12 số / CMND 9 số để tự động tra cứu.';
+  const canSearchCustomer = (source === 'demo' && /^DEMO-[A-Z0-9-]+$/i.test(idInput.trim())) || /^\d{9,13}$/.test(idInput.replace(/\D/g, ''));
+  const lookupText = !draft.store_id ? 'Chọn cơ sở cho thuê trước khi tra cứu khách hàng.' : lookupState === 'loading' ? 'Đang tra cứu khách hàng…' : lookupState === 'found' ? `Đã tìm thấy khách hàng #${draft.customer_id} · Thông tin đã tự động điền` : lookupState === 'matches' ? `Tìm thấy ${customerMatches.length} hồ sơ. Chọn đúng khách hàng bên dưới.` : lookupState === 'missing' ? 'Chưa có khách hàng mang giấy tờ hoặc số điện thoại này tại cơ sở đã chọn.' : source === 'demo' ? 'Nhập CCCD/CMND, số điện thoại hoặc thử DEMO-000001.' : 'Nhập CCCD/CMND hoặc số điện thoại (9–13 số) để tra cứu.';
   function field(key: keyof Omit<ContractDraft, 'customer' | 'vehicles' | 'customer_id'>, label: string, type = 'text', required = false) {
     return <div className="mg-field" key={key}><label htmlFor={`contract-${key}`}>{label}{required && <span aria-hidden="true"> *</span>}</label>
       <input id={`contract-${key}`} name={key} type={type} value={String(draft[key])} required={required} min={type === 'number' ? 0 : undefined} step={type === 'number' ? 1 : undefined}
@@ -130,7 +163,7 @@ export function ContractComposer({ row, mode = 'print', onClose }: { row?: Manag
             <div className="mg-field mg-field-wide"><label htmlFor="contract-record-notes">Ghi chú hợp đồng</label><textarea id="contract-record-notes" value={notes} onChange={event => setNotes(event.target.value)} /></div>
           </div></fieldset>}
           <fieldset className="mg-composer-section"><legend><span>01</span>Cơ sở và nhân sự</legend><div className="mg-form-grid">
-            <div className="mg-field"><label htmlFor="contract-store">Cơ sở cho thuê *</label><select id="contract-store" value={draft.store_id} aria-invalid={Boolean(errors.store_id)} onChange={event => { change('store_id', event.target.value); change('staff_id', ''); change('vehicles', [emptyVehicle()]); change('unit_price', ''); }}>
+            <div className="mg-field"><label htmlFor="contract-store">Cơ sở cho thuê *</label><select id="contract-store" value={draft.store_id} aria-invalid={Boolean(errors.store_id)} onChange={event => { change('store_id', event.target.value); change('staff_id', ''); change('vehicles', [emptyVehicle()]); change('unit_price', ''); changeIdentity(''); }}>
               <option value="">Chọn cơ sở</option>{dataset?.stores.map(store => <option key={store.id} value={store.id}>{store.name}</option>)}</select>{errors.store_id && <p className="mg-field-error">{errors.store_id}</p>}</div>
             <div className="mg-field"><label htmlFor="contract-staff">Nhân sự phụ trách *</label><select id="contract-staff" value={draft.staff_id} disabled={!draft.store_id || staffLoading || Boolean(staffError)} aria-invalid={Boolean(errors.staff_id)} onChange={event => change('staff_id', event.target.value)}>
               <option value="">{staffLoading ? 'Đang tải nhân sự…' : !draft.store_id ? 'Chọn cơ sở trước' : 'Chọn nhân sự tại cơ sở'}</option>{branchStaff.map(person => <option key={person.id} value={person.id} disabled={!staffIsAvailable(person)}>{person.name} · {person.code}{!staffIsAvailable(person) ? ' · Không làm việc' : ''}</option>)}</select>
@@ -138,11 +171,12 @@ export function ContractComposer({ row, mode = 'print', onClose }: { row?: Manag
             {representative && <div className="mg-composer-person mg-field-wide"><CheckCircle2 size={17} /><span>Đại diện bên A: <strong>{representative.name}</strong> · {representative.position || '—'}</span></div>}
           </div></fieldset>
           <fieldset className="mg-composer-section"><legend><span>02</span>Thông tin khách hàng</legend>
-            <div className="mg-field"><label htmlFor="contract-id-card">CCCD / CMND *</label><div className="mg-lookup-controls"><input id="contract-id-card" autoComplete="off" value={idInput} aria-invalid={Boolean(errors.id_card)} aria-describedby="contract-lookup-status" placeholder={source === 'demo' ? 'DEMO-000001 hoặc số giấy tờ' : '9 hoặc 12 chữ số'} onChange={event => changeIdentity(event.target.value)} />
-              <button className="mg-button" type="button" disabled={!validIdCard(idInput, source) || lookupState === 'loading'} onClick={() => { preserveCustomer.current = false; setLookupRetry(value => value + 1); }}>{lookupState === 'loading' ? <LoaderCircle size={16} className="mg-spin" /> : <Search size={16} />}Tra cứu</button></div>
+            <div className="mg-composer-customer-actions"><button className="mg-button" type="button" disabled={!draft.store_id} onClick={openCustomerCreate}><UserPlus size={16} />Thêm mới</button></div>
+            <div className="mg-field"><label htmlFor="contract-id-card">CCCD / CMND hoặc số điện thoại *</label><div className="mg-lookup-controls"><input id="contract-id-card" autoComplete="off" value={idInput} disabled={!draft.store_id} aria-invalid={Boolean(errors.id_card)} aria-describedby="contract-lookup-status" placeholder={!draft.store_id ? 'Chọn cơ sở trước khi tra cứu khách hàng' : source === 'demo' ? 'CCCD, SĐT hoặc DEMO-000001' : 'CCCD/CMND hoặc SĐT'} onChange={event => changeIdentity(event.target.value)} />
+              <button className="mg-button" type="button" disabled={!draft.store_id || !canSearchCustomer || lookupState === 'loading'} onClick={() => { preserveCustomer.current = false; setLookupRetry(value => value + 1); }}>{lookupState === 'loading' ? <LoaderCircle size={16} className="mg-spin" /> : <Search size={16} />}Tra cứu</button></div>
               <div id="contract-lookup-status" className={`mg-lookup-status is-${lookupState}`} role={lookupState === 'error' ? 'alert' : 'status'}>{lookupState === 'error' ? lookupError : lookupText}</div>
+              {lookupState === 'matches' && <div className="mg-customer-match-list" role="listbox" aria-label="Chọn khách hàng tìm thấy">{customerMatches.map(customer => <button key={customer.id} type="button" role="option" aria-selected="false" className="mg-customer-match" onClick={() => selectCustomer(customer)}><strong>{customer.name}</strong><span>{customer.phone || 'Chưa có SĐT'} · CCCD {customer.id_card || 'Chưa có'}</span></button>)}</div>}
               {errors.id_card && <p className="mg-field-error">{errors.id_card}</p>}
-              {lookupState === 'missing' && <button className="mg-button mg-button-primary mg-create-customer-inline" type="button" onClick={() => setCustomerModal(true)}><UserPlus size={16} />Thêm khách hàng tại đây</button>}
             </div>
             <div className="mg-form-grid mg-customer-autofill">{customerFields.map(item => <div className={`mg-field ${item.wide ? 'mg-field-wide' : ''}`} key={item.key}><label htmlFor={`contract-customer-${item.key}`}>{item.label}</label><input id={`contract-customer-${item.key}`} type={item.type || 'text'} value={draft.customer[item.key]} disabled={lookupState !== 'found'} aria-invalid={Boolean(errors[item.key])} onChange={event => {
               setDraft(previous => ({ ...previous, customer: { ...previous.customer, [item.key]: event.target.value } })); setErrors(previous => ({ ...previous, [item.key]: '' }));
@@ -177,7 +211,7 @@ export function ContractComposer({ row, mode = 'print', onClose }: { row?: Manag
           <button type="submit" value="preview" className={`mg-button${mode === 'print' ? ' mg-button-primary' : ''}`} disabled={saving || staffLoading || lookupState === 'loading'}><Printer size={16} />Xem mẫu in</button></div>
       </form>
     </Dialog>
-    {customerModal && <CustomerCreateDialog idCard={normalizeIdCard(idInput)} storeId={draft.store_id} onCreated={customerCreated} onClose={() => setCustomerModal(false)} />}
+    {customerModal && <CustomerCreateDialog idCard={/^\d{9}$|^\d{12}$/.test(normalizeIdCard(idInput)) ? normalizeIdCard(idInput) : ''} storeId={draft.store_id} onCreated={customerCreated} onClose={() => setCustomerModal(false)} />}
     {document && <ContractPrintPreview doc={document} onClose={() => setDocument(null)} />}
   </>;
 }

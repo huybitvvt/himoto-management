@@ -5,8 +5,11 @@ import { CUSTOMER_STATUSES } from './config';
 
 export interface ContractAutofillRepository {
   lookupCustomer(idCard: string, signal?: AbortSignal): Promise<ManagementRow | null>;
+  searchCustomers(query: string, storeId: string, signal?: AbortSignal): Promise<ManagementRow[]>;
   loadStaff(storeId: string, signal?: AbortSignal): Promise<ManagementRow[]>;
   createCustomer(customer: CustomerDetails, assignment?: CustomerAssignment): Promise<ManagementRow>;
+  updateCustomer(customer: ManagementRow): Promise<ManagementRow>;
+  deleteCustomer(id: number): Promise<void>;
 }
 export function createDemoAutofillRepository(repository: ManagementRepository): ContractAutofillRepository {
   return {
@@ -16,6 +19,13 @@ export function createDemoAutofillRepository(repository: ManagementRepository): 
       const matches = dataset.customers.filter(row => normalizeIdCard(String(row.id_card || '')) === normalizeIdCard(idCard));
       if (matches.length > 1) throw new Error('Có nhiều hồ sơ trùng số giấy tờ. Cần kiểm tra lại dữ liệu khách hàng.');
       return matches[0] || null;
+    },
+    async searchCustomers(query, storeId, signal) {
+      signal?.throwIfAborted();
+      const dataset = await repository.load(); signal?.throwIfAborted();
+      const normalized = normalizeIdCard(query);
+      const phone = query.replace(/\D/g, '');
+      return dataset.customers.filter(row => String(row.store_id) === storeId && (normalizeIdCard(String(row.id_card || '')) === normalized || String(row.phone || '').replace(/\D/g, '') === phone));
     },
     async loadStaff(storeId, signal) { signal?.throwIfAborted(); return staffMatchesStore((await repository.load()).staff, storeId); },
     async createCustomer(customer, assignment) {
@@ -33,6 +43,13 @@ export function createDemoAutofillRepository(repository: ManagementRepository): 
       await repository.save('customers', row);
       return row;
     },
+    async updateCustomer(customer) {
+      const dataset = await repository.save('customers', customer);
+      return dataset.customers.find(row => row.id === customer.id) || customer;
+    },
+    async deleteCustomer(id) {
+      throw new Error(`Không thể xóa khách hàng #${id} trong dữ liệu mẫu.`);
+    },
   };
 }
 type ApiRecord = Record<string, unknown>;
@@ -42,8 +59,11 @@ export function createApiAutofillRepository(baseUrl = '/api'): ContractAutofillR
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') || localStorage.getItem('jwt_token') : null;
     const response = await fetch(`${baseUrl.replace(/\/$/, '')}${path}`, { ...options, credentials: 'same-origin',
       headers: { Accept: 'application/json', ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
-    if (!response.ok) throw new Error(`Không thực hiện được yêu cầu (HTTP ${response.status}). Kiểm tra kết nối, quyền và phiên đăng nhập.`);
-    const envelope: unknown = await response.json();
+    const envelope: unknown = await response.json().catch(() => null);
+    if (!response.ok) {
+      const message = object(envelope) && typeof envelope.message === 'string' ? envelope.message : '';
+      throw new Error(message || `Không thực hiện được yêu cầu (HTTP ${response.status}). Kiểm tra kết nối và phiên làm việc.`);
+    }
     if (!object(envelope) || envelope.status !== 'success' || !('data' in envelope)) throw new Error('API trả về dữ liệu chưa được hỗ trợ.');
     return envelope.data;
   }
@@ -56,6 +76,13 @@ export function createApiAutofillRepository(baseUrl = '/api'): ContractAutofillR
       const row = mapApiRow('customers', payload);
       if (normalizeIdCard(String(row.id_card || '')) !== normalized) throw new Error('API trả về khách hàng không khớp số CCCD/CMND.');
       return row;
+    },
+    async searchCustomers(query, storeId, signal) {
+      const normalized = query.replace(/\D/g, '');
+      if (!normalized || !storeId) return [];
+      const payload = await request(`${READ_ENDPOINTS.customers}/search?${new URLSearchParams({ query: normalized, store_id: storeId })}`, { method: 'GET', signal });
+      if (!Array.isArray(payload) || !payload.every(object)) throw new Error('API tra cứu trả về danh sách chưa được hỗ trợ.');
+      return payload.map(row => mapApiRow('customers', row));
     },
     async loadStaff(storeId, signal) {
       if (!storeId) return [];
@@ -75,18 +102,30 @@ export function createApiAutofillRepository(baseUrl = '/api'): ContractAutofillR
       throw new Error('Danh sách nhân sự vượt giới hạn tải.');
     },
     async createCustomer(customer, assignment) {
-      if (assignment) throw new Error('API tạo khách hàng hiện chưa hỗ trợ lưu trạng thái và cơ sở.');
       const errors = validateCustomer(customer, 'api');
       if (Object.keys(errors).length) throw new Error(Object.values(errors)[0]);
       if (await this.lookupCustomer(customer.id_card)) throw new Error('Số CCCD/CMND này đã có. Hãy tra cứu khách hàng thay vì tạo thêm.');
-      // These five fields are the existing Nest CustomerService.create contract.
+      // The local Supabase adapter also stores the selected branch when creating from a contract.
       const payload = await request(READ_ENDPOINTS.customers, { method: 'POST', body: JSON.stringify({
         name: customer.name.trim(), phone: customer.phone.trim(), email: customer.email.trim(), address: customer.address.trim(), id_card: normalizeIdCard(customer.id_card),
+        ...(assignment ? { status: assignment.status, store_id: assignment.store_id } : {}),
       }) });
       if (!object(payload)) throw new Error('API chưa trả về hồ sơ khách hàng đã tạo. Không thể xác nhận kết quả.');
       const row = mapApiRow('customers', payload);
       if (normalizeIdCard(String(row.id_card || '')) !== normalizeIdCard(customer.id_card)) throw new Error('Hồ sơ được trả về không khớp số giấy tờ đã nhập.');
       return row;
+    },
+    async updateCustomer(customer) {
+      const payload = await request(`${READ_ENDPOINTS.customers}/${customer.id}`, { method: 'PATCH', body: JSON.stringify({
+        name: String(customer.name || '').trim(), phone: String(customer.phone || '').trim(), email: String(customer.email || '').trim(),
+        address: String(customer.address || '').trim(), id_card: normalizeIdCard(String(customer.id_card || '')),
+        status: customer.status, warning_note: String(customer.warning_note || '').trim(), store_id: customer.store_id ?? null,
+      }) });
+      if (!object(payload)) throw new Error('API chưa trả về hồ sơ khách hàng đã cập nhật.');
+      return mapApiRow('customers', payload);
+    },
+    async deleteCustomer(id) {
+      await request(`${READ_ENDPOINTS.customers}/${id}`, { method: 'DELETE' });
     },
   };
 }

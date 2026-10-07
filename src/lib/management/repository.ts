@@ -61,7 +61,7 @@ export function mapApiRow(kind: ManagementKind, raw: ApiRow): ManagementRow {
   if (kind === 'stores') return { ...base, manager_name: text(raw.manager_name),
     vehicle_count: number(raw.vehicle_count), staff_count: number(raw.staff_count),
     status: ({ '1': 'active', '0': 'inactive' } as Record<string, string>)[base.status] || base.status };
-  if (kind === 'customers') return { ...base, id_card: text(raw.id_card || raw.identity_card), warning_note: text(raw.warning || raw.warning_note),
+  if (kind === 'customers') return { ...base, code: text(raw.code) || `KH-${String(id).padStart(3, '0')}`, id_card: text(raw.id_card || raw.identity_card), warning_note: text(raw.warning || raw.warning_note),
     id_card_issued_on: text(raw.id_card_issued_on || raw.id_card_date), id_card_issued_by: text(raw.id_card_issued_by || raw.id_card_place),
     birthday: text(raw.birthday || raw.date_of_birth), relatives_text: text(raw.relatives_text) || relativesText(raw.relatives),
     contract_count: number(raw.contract_count), status: ['blacklist', 'bad_debt'].includes(base.status) ? 'blacklist' : raw.warning || raw.warning_note ? 'warning' :

@@ -21,6 +21,7 @@ function Shell({ children }: { children: ReactNode }) {
   const { dataset, selectedStore, selectStore, source, reset } = useManagement();
   const pathname = usePathname();
   const active = navigation.find(n => pathname.startsWith(n.href)) || navigation[4];
+  const writableCustomers = source === 'api' && active.kind === 'customers';
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
@@ -56,8 +57,8 @@ function Shell({ children }: { children: ReactNode }) {
       title={collapsed ? item.label : undefined} onClick={() => setMobileOpen(false)}>
       <item.icon size={19} strokeWidth={1.8} /><span>{item.label}</span>{active.href === item.href && <ChevronRight className="mg-nav-arrow" size={15} />}
     </Link>)}</nav>
-    <div className="mg-sidebar-bottom"><div className="mg-source-marker"><span />{source === 'demo' ? 'Phiên xem trước' : 'Dữ liệu API · chỉ đọc'}</div>
-      <p>{source === 'demo' ? 'Dữ liệu mẫu để duyệt giao diện.' : 'Kết nối dữ liệu từ hệ thống.'}</p><span className="mg-version">HIMOTO MANAGEMENT / 01</span></div>
+    <div className="mg-sidebar-bottom"><div className="mg-source-marker"><span />{source === 'demo' ? 'Phiên xem trước' : writableCustomers ? 'Supabase · khách hàng có thể sửa' : 'Dữ liệu API · chỉ đọc'}</div>
+      <p>{source === 'demo' ? 'Dữ liệu mẫu để duyệt giao diện.' : writableCustomers ? 'Thêm, cập nhật và xóa hồ sơ khách hàng trực tiếp.' : 'Kết nối dữ liệu từ hệ thống.'}</p><span className="mg-version">HIMOTO MANAGEMENT / 01</span></div>
   </>;
 
   return <div className={`mg-app ${collapsed ? 'mg-is-collapsed' : ''}`}>
@@ -73,15 +74,15 @@ function Shell({ children }: { children: ReactNode }) {
           <span>Quản lý</span><ChevronRight size={14} /><strong>{active.label}</strong></div>
         <div className="mg-topbar-right"><label className="mg-branch-select"><Building2 size={16} /><span className="mg-sr-only">Cơ sở đang xem</span><select value={selectedStore} onChange={event => selectStore(event.target.value)}>
           <option value="all">Tất cả cơ sở</option>{dataset?.stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-          <span className={`mg-source-badge ${source === 'api' ? 'is-api' : ''}`}>{source === 'demo' ? 'Dữ liệu mẫu' : 'Chỉ đọc'}</span>
-          <details className="mg-user-menu" ref={menuRef}><summary aria-label="Menu người dùng"><span className="mg-user-avatar">QT</span><div><strong>Quản trị viên</strong><small>{source === 'demo' ? 'Tài khoản mẫu' : 'Phiên tra cứu'}</small></div><ChevronDown size={14} /></summary>
-            <div className="mg-popover"><strong>{source === 'demo' ? 'Phiên xem trước giao diện' : 'Phiên tra cứu API'}</strong><p>{source === 'demo' ? 'Thay đổi dữ liệu mẫu được giữ khi chuyển giữa các màn và mất khi tải lại trang.' : 'Thao tác ghi dữ liệu chưa được tích hợp.'}</p>
+          <span className={`mg-source-badge ${source === 'api' ? 'is-api' : ''}`}>{source === 'demo' ? 'Dữ liệu mẫu' : writableCustomers ? 'Có thể sửa' : 'Chỉ đọc'}</span>
+          <details className="mg-user-menu" ref={menuRef}><summary aria-label="Menu người dùng"><span className="mg-user-avatar">QT</span><div><strong>Quản trị viên</strong><small>{source === 'demo' ? 'Tài khoản mẫu' : writableCustomers ? 'Supabase' : 'Phiên tra cứu'}</small></div><ChevronDown size={14} /></summary>
+            <div className="mg-popover"><strong>{source === 'demo' ? 'Phiên xem trước giao diện' : writableCustomers ? 'Khách hàng kết nối Supabase' : 'Phiên tra cứu API'}</strong><p>{source === 'demo' ? 'Thay đổi dữ liệu mẫu được giữ khi chuyển giữa các màn và mất khi tải lại trang.' : writableCustomers ? 'Thêm và cập nhật lưu trực tiếp; xóa hồ sơ có đơn thuê sẽ bị chặn để giữ lịch sử.' : 'Thao tác ghi dữ liệu chưa được tích hợp cho danh mục này.'}</p>
               {source === 'demo' && <button type="button" onClick={() => { if (menuRef.current) menuRef.current.open = false; setResetOpen(true); }}><RotateCcw size={16} />Khôi phục dữ liệu mẫu</button>}
               <Link href={rentalModuleUrl}><ArrowUpRight size={16} />Mở module đơn thuê xe</Link></div></details>
         </div>
       </header>
       <main id="management-main" className="mg-content" tabIndex={-1}>{children}</main>
-      <footer className="mg-app-footer"><span>HIMOTO <span className="mg-footer-dot">·</span> Quản lý vận hành</span><span>{source === 'demo' ? 'Bản xem trước · Chưa kết nối dữ liệu thật' : 'Chế độ tra cứu · Không ghi dữ liệu'}</span></footer>
+      <footer className="mg-app-footer"><span>HIMOTO <span className="mg-footer-dot">·</span> Quản lý vận hành</span><span>{source === 'demo' ? 'Bản xem trước · Chưa kết nối dữ liệu thật' : writableCustomers ? 'Khách hàng · Ghi trực tiếp vào Supabase' : 'Chế độ tra cứu · Không ghi dữ liệu'}</span></footer>
     </div>
     {resetOpen && <Dialog title="Khôi phục dữ liệu mẫu?" subtitle="Các thay đổi trong phiên xem trước sẽ bị bỏ." onClose={() => { if (!resetting) setResetOpen(false); }}>
       <div className="mg-dialog-body"><p>Dữ liệu thật của hệ thống không bị ảnh hưởng.</p>{resetError && <p className="mg-field-error" role="alert">{resetError}</p>}</div>

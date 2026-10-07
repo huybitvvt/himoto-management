@@ -20,6 +20,8 @@ interface ManagementContextValue {
   notify: (message: string) => void;
   contractAutofill: ContractAutofillRepository;
   createCustomer: (customer: CustomerDetails, assignment?: CustomerAssignment) => Promise<ManagementRow>;
+  updateCustomer: (customer: ManagementRow) => Promise<ManagementRow>;
+  deleteCustomer: (id: number) => Promise<void>;
   cloneContract: (id: number) => Promise<ManagementRow>;
   saveContract: (id: number, edits: ContractEdits) => Promise<ManagementRow>;
 }
@@ -77,7 +79,20 @@ export function ManagementProvider({ children }: { children: ReactNode }) {
     notify(repository.source === 'demo' ? 'Đã thêm khách hàng mẫu và điền vào hợp đồng. Chỉ lưu trong phiên xem trước.' : 'Đã tạo khách hàng và điền vào hợp đồng.');
     return row;
   };
-  return <ManagementContext.Provider value={{ dataset, loading, error, source: repository.source, selectedStore, selectStore, reload, reset, save, notify, contractAutofill, createCustomer, cloneContract, saveContract }}>
+  const updateCustomer = async (customer: ManagementRow) => {
+    const updated = await contractAutofill.updateCustomer(customer);
+    const current = dataset?.customers.find(item => item.id === updated.id);
+    const row = { ...updated, code: customer.code, store_name: dataset?.stores.find(store => store.id === updated.store_id)?.name || '', contract_count: current?.contract_count ?? customer.contract_count ?? 0 };
+    setDataset(current => current ? { ...current, customers: current.customers.map(item => item.id === row.id ? row : item) } : current);
+    notify(repository.source === 'demo' ? 'Đã cập nhật khách hàng mẫu trong phiên xem trước.' : 'Đã cập nhật hồ sơ khách hàng trong Supabase.');
+    return row;
+  };
+  const deleteCustomer = async (id: number) => {
+    await contractAutofill.deleteCustomer(id);
+    setDataset(current => current ? { ...current, customers: current.customers.filter(item => item.id !== id) } : current);
+    notify(repository.source === 'demo' ? 'Đã xóa khách hàng khỏi phiên xem trước.' : 'Đã xóa hồ sơ khách hàng khỏi Supabase.');
+  };
+  return <ManagementContext.Provider value={{ dataset, loading, error, source: repository.source, selectedStore, selectStore, reload, reset, save, notify, contractAutofill, createCustomer, updateCustomer, deleteCustomer, cloneContract, saveContract }}>
     {children}
     {notification && <div className="mg-toast" role="status"><span>{notification}</span><button type="button" onClick={() => notify('')} aria-label="Đóng thông báo">×</button></div>}
   </ManagementContext.Provider>;

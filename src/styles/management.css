@@ -3,7 +3,7 @@
   --mg-ink: #202833; --mg-muted: #68717e; --mg-line: #e8ebef;
   --mg-gold: #e5a800; --mg-gold-soft: #fff6da; --mg-page: #f7f8fa;
   display: flex; min-height: 100dvh; background: var(--mg-page); color: var(--mg-ink);
-  font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; line-height: 1.5;
+  font-family: 'Roboto', Arial, sans-serif; font-size: 14px; line-height: 1.5;
 }
 .mg-app *, .mg-dialog * { box-sizing: border-box; }
 .mg-app button, .mg-app input, .mg-app select, .mg-app textarea, .mg-dialog button, .mg-dialog input, .mg-dialog select, .mg-dialog textarea { font: inherit; }
@@ -68,6 +68,8 @@
 .mg-button:hover:not(:disabled) { background: #f7f8fa; border-color: #c7cdd6; }
 .mg-button-primary { border-color: #e5a800; background: #efba29; color: #3d3007; font-weight: 650; }
 .mg-button-primary:hover:not(:disabled) { background: #eab01b; border-color: #dca20b; }
+.mg-button-danger { border-color: #a31620; background: #a31620; color: #fff; font-weight: 650; }
+.mg-button-danger:hover:not(:disabled) { background: #85111a; border-color: #85111a; }
 .mg-icon-button { width: 30px; height: 30px; padding: 0; border: 1px solid transparent; border-radius: 5px; display: inline-flex; justify-content: center; align-items: center; color: #7b8693 !important; background: transparent; flex-shrink: 0; }
 .mg-icon-button:hover:not(:disabled) { color: #69500a !important; background: #fff6db; border-color: #f2e7c5; }
 .mg-readonly { display: flex; align-items: center; gap: 6px; color: #5f6d7c; background: #eef1f5; border-radius: 6px; padding: 9px 11px; font-size: 11px; }
@@ -118,7 +120,7 @@
 .mg-table tbody tr:last-child td { border-bottom: 0; }
 .mg-table tbody tr:hover td { background: #fffef9; }
 .mg-index { width: 45px; text-align: center !important; color: #9ca5b0 !important; font-size: 10px; padding-left: 16px !important; }
-.mg-code { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 10px; letter-spacing: -.2px; color: #5c6877; }
+.mg-code { font-family: 'Roboto', Arial, sans-serif; font-size: 10px; letter-spacing: -.2px; color: #5c6877; }
 .mg-identity { display: flex; align-items: center; gap: 10px; }
 .mg-identity > div { min-width: 0; }
 .mg-identity strong { display: block; font-weight: 600; color: #424d5c; max-width: 190px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
@@ -169,7 +171,7 @@
 .mg-is-collapsed .mg-sidebar nav { margin-top: 45px; }
 .mg-is-collapsed .mg-sidebar .mg-nav-link { justify-content: center; padding: 12px; }
 .mg-mobile-toggle, .mg-mobile-nav { display: none; }
-.mg-dialog { width: 650px; max-width: calc(100vw - 32px); max-height: calc(100dvh - 48px); padding: 0; margin: auto; background: #fff; border: 1px solid #e3e7ed; border-radius: 13px; box-shadow: 0 24px 90px #15233330; color: #384654; font: 13px/1.5 'Segoe UI', Arial, sans-serif; overflow-y: auto; }
+.mg-dialog { width: 650px; max-width: calc(100vw - 32px); max-height: calc(100dvh - 48px); padding: 0; margin: auto; background: #fff; border: 1px solid #e3e7ed; border-radius: 13px; box-shadow: 0 24px 90px #15233330; color: #384654; font: 13px/1.5 'Roboto', Arial, sans-serif; overflow-y: auto; }
 .mg-dialog::backdrop, .mg-mobile-nav::backdrop { background: #18212b70; backdrop-filter: blur(2px); }
 .mg-dialog-header { padding: 23px 26px 19px; display: flex; align-items: flex-start; justify-content: space-between; border-bottom: 1px solid #e9edf2; gap: 16px; background: #fff; position: sticky; top: 0; z-index: 2; }
 .mg-dialog h2 { font-size: 18px; line-height: 1.5; font-weight: 650; margin: 0; color: #2b3644; }
@@ -191,7 +193,7 @@
 .mg-detail-grid dt { font-size: 10px; color: #8a96a5; margin-bottom: 4px; }
 .mg-detail-grid dd { margin: 0; color: #4b5c70; font-size: 13px; overflow-wrap: anywhere; }
 .mg-related-link { margin-top: 24px; }
-.mg-toast { position: fixed; bottom: 24px; right: 24px; max-width: min(420px, calc(100vw - 32px)); padding: 14px 16px; display: flex; align-items: flex-start; gap: 12px; color: #fff; background: #293a35; border: 1px solid #3c534b; border-radius: 9px; box-shadow: 0 8px 30px #182a2825; z-index: 150; font: 12px/1.6 'Segoe UI', Arial, sans-serif; }
+.mg-toast { position: fixed; bottom: 24px; right: 24px; max-width: min(420px, calc(100vw - 32px)); padding: 14px 16px; display: flex; align-items: flex-start; gap: 12px; color: #fff; background: #293a35; border: 1px solid #3c534b; border-radius: 9px; box-shadow: 0 8px 30px #182a2825; z-index: 150; font: 12px/1.6 'Roboto', Arial, sans-serif; }
 .mg-toast button { border: 0; color: #fff; background: transparent; font-size: 19px; line-height: 1; cursor: pointer; }
 .mg-spin { animation: mg-spin 1s linear infinite; }
 @keyframes mg-spin { to { transform: rotate(360deg); } }
@@ -289,8 +291,16 @@
 .mg-lookup-status.is-found { color: #087450; }
 .mg-lookup-status.is-error { color: #bc3037; }
 .mg-lookup-status.is-missing { color: #8d6514; }
+.mg-lookup-status.is-matches { color: #8d6514; }
 .mg-customer-autofill { margin-top: 18px; }
+.mg-composer-customer-actions { display: flex; justify-content: flex-end; margin-bottom: 10px; }
 .mg-create-customer-inline { margin-top: 12px; }
+.mg-customer-match-list { display: grid; gap: 6px; margin-top: 8px; }
+.mg-customer-match { display: grid; gap: 3px; padding: 9px 11px; border: 1px solid #d8dbe0; border-radius: 7px; text-align: left; color: inherit; background: #fff; cursor: pointer; }
+.mg-customer-match:hover { border-color: #b4232d; background: #fff7f7; }
+.mg-customer-match span { color: #68707a; font-size: 12px; }
+.mg-delete-action { color: #b4232d !important; }
+.mg-delete-action:hover:not(:disabled) { color: #8e111b !important; background: #fff0f0; border-color: #f4caca; }
 .mg-composer-hint { font-size: 11px; line-height: 1.7; margin: 12px 0 0; color: #607085; }
 .mg-composer-person { display: flex; align-items: center; gap: 8px; padding: 10px 13px; border-radius: 7px; background: #edf7f2; color: #087450; }
 .mg-inline-button { border: 0; background: transparent; color: #805900; text-decoration: underline; margin-left: 8px; padding: 4px; }
@@ -299,6 +309,7 @@
 .mg-composer-vehicle .mg-form-grid { margin-top: 13px; }
 .mg-composer-vehicle-summary { font-size: 12px; color: #607085; padding-top: 8px; }
 .mg-table-contracts .mg-actions-column { width: 156px; min-width: 156px; }
+.mg-table-customers .mg-actions-column { width: 110px; min-width: 110px; }
 .mg-contract-actions { flex-wrap: wrap; max-width: 144px; margin: auto; }
 .mg-clone-button { flex-basis: 100%; font-size: 12px; gap: 5px; padding: 6px; min-height: 30px; }
 .mg-composer-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
@@ -358,4 +369,138 @@
   .mg-composer-vehicle { padding: 12px; }
   .mg-composer-person { align-items: flex-start; }
   .mg-composer-person svg { flex-shrink: 0; margin-top: 3px; }
+}
+
+/* Red and black theme with larger, stronger text across the management UI. */
+.mg-app {
+  --mg-ink: #111;
+  --mg-muted: #383838;
+  --mg-line: #dedada;
+  --mg-gold: #b5121b;
+  --mg-gold-soft: #fae8e9;
+  --mg-page: #f5f3f3;
+  color: #111;
+  font-size: 16px;
+  font-weight: 650;
+}
+.mg-app :focus-visible, .mg-dialog :focus-visible { outline-color: #b5121b; }
+.mg-search:focus-within { outline-color: #b5121b; }
+.mg-column-menu input { accent-color: #b5121b; }
+.mg-app :is(button, a, p, span, small, label, summary, input, select, textarea, th, td, dt, dd, li),
+.mg-dialog :is(button, a, p, span, small, label, summary, input, select, textarea, th, td, dt, dd, li),
+.mg-contract-preview :is(button, a, p, span, small, label, th, td, li) {
+  font-size: max(14px, 1em) !important;
+  font-weight: 650 !important;
+}
+.mg-app :is(strong, b, h1, h2, h3, h4, h5, h6, th, legend),
+.mg-dialog :is(strong, b, h1, h2, h3, h4, h5, h6, th, legend),
+.mg-contract-preview :is(strong, b, h1, h2, h3, h4, h5, h6) {
+  font-weight: 800 !important;
+}
+.mg-sidebar, .mg-topbar, .mg-mobile-nav[open], .mg-dialog, .mg-dialog-header,
+.mg-popover, .mg-data-panel, .mg-table td, .mg-contract-preview .modal-content,
+.mg-contract-preview .modal-header, .mg-contract-preview .modal-footer .btn {
+  background-color: #fff;
+}
+.mg-app h1, .mg-dialog h2, .mg-cashbook-panel-heading h2,
+.mg-contract-preview .modal-title, .mg-composer-section legend { color: #111; }
+.mg-nav-link:hover, .mg-table tbody tr:hover td, .mg-cashbook-overview a:hover,
+.mg-contract-preview .card, .mg-contract-preview th { background-color: #f8eeee; }
+.mg-nav-link.is-active, .mg-status-tabs > button.is-active,
+.mg-status-tabs > button.is-active span, .mg-current-page,
+.mg-active-filter, .mg-icon-button:hover:not(:disabled) {
+  color: #a10f18 !important;
+  background-color: #fae8e9;
+  border-color: #e7bfc2;
+}
+.mg-nav-arrow, .mg-icon-button:hover:not(:disabled) svg,
+.mg-status-tabs > button.is-active, .mg-sort > svg,
+.mg-table th[aria-sort='ascending'] .mg-sort > svg,
+.mg-table th[aria-sort='descending'] .mg-sort > svg,
+.mg-cashbook-count-marker, .mg-cashbook-count-marker.is-expense,
+.mg-cashbook-symbol, .mg-cashbook-symbol.is-expense { color: #b5121b; }
+.mg-cashbook-count-marker, .mg-cashbook-count-marker.is-expense { background: #b5121b; }
+.mg-cashbook-symbol, .mg-cashbook-symbol.is-expense { background: #fae8e9; }
+.mg-button-primary, .mg-button-primary:hover:not(:disabled) {
+  color: #fff;
+  background: #b5121b;
+  border-color: #9f0f17;
+}
+.mg-button-primary:hover:not(:disabled) { background: #970d15; }
+.mg-button.mg-button-danger, .mg-button.mg-button-danger:hover:not(:disabled) { color: #fff; background: #a31620; border-color: #a31620; }
+.mg-button.mg-button-danger:hover:not(:disabled) { background: #85111a; border-color: #85111a; }
+.mg-button:hover:not(:disabled), .mg-popover > button:hover, .mg-popover > a:hover {
+  color: #9f0f17;
+  border-color: #d9a4a7;
+}
+.mg-status-green, .mg-status-blue, .mg-status-amber, .mg-status-gray,
+.mg-status-red { color: #111; background: #f0eded; }
+.mg-status-red, .mg-lookup-status.is-error, .mg-field-error,
+.mg-error-message, .mg-lookup-status.is-found, .mg-lookup-status.is-missing {
+  color: #a10f18;
+}
+.mg-status-red, .mg-error-message { background: #fae8e9; }
+.mg-org-section { margin: 20px 0; padding: 22px; background: #fff; border: 1px solid #dedede; border-radius: 12px; box-shadow: 0 8px 24px #11111108; }
+.mg-org-heading { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 18px; }
+.mg-org-heading h2 { margin: 5px 0 3px; color: #181818; font-size: 21px; font-weight: 800; }
+.mg-org-heading p { margin: 0; color: #686868; font-size: 13px; }
+.mg-org-scroll { overflow: auto; padding: 10px 0 16px; }
+.mg-org-chart { min-width: 1160px; padding: 2px 8px 12px; text-align: center; }
+.mg-org-root { position: relative; width: 370px; max-width: 90%; margin: 0 auto 36px; padding: 12px 18px; border-radius: 7px; background: #123b8b; color: #fff; font-family: 'Roboto', Arial, sans-serif; font-size: 24px; font-weight: 800; letter-spacing: .04em; box-shadow: 0 2px 5px #0002; }
+.mg-org-root::after { position: absolute; top: 100%; left: 50%; height: 22px; border-left: 2px solid #646464; content: ''; }
+.mg-org-departments, .mg-org-stores { position: relative; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; align-items: start; }
+.mg-org-departments::before { position: absolute; top: -14px; right: 8.3%; left: 8.3%; border-top: 2px solid #646464; content: ''; }
+.mg-org-card, .mg-org-store { position: relative; overflow: visible; border: 1px solid var(--org-border); border-radius: 8px; background: var(--org-bg); }
+.mg-org-card::before { position: absolute; bottom: 100%; left: 50%; height: 14px; border-left: 2px solid #646464; content: ''; }
+.mg-org-card h3, .mg-org-store h3 { margin: 0; padding: 9px 5px; border-radius: 7px 7px 0 0; background: var(--org-head); color: #191919; font-family: 'Roboto', Arial, sans-serif; font-size: 15px; font-weight: 800; line-height: 1.25; }
+.mg-org-people { display: grid; gap: 5px; padding: 5px; }
+.mg-org-person { display: grid; gap: 3px; justify-items: center; padding: 7px 4px; border: 1px solid color-mix(in srgb, var(--org-border) 55%, white); border-radius: 6px; background: #ffffffc9; color: #202020; font-family: 'Roboto', Arial, sans-serif; font-size: 12px; line-height: 1.2; }
+.mg-org-person strong { font-weight: 700; }
+.mg-org-phone { display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 4px; align-items: center; font-family: 'Roboto', Arial, sans-serif; font-size: 11px; }
+.mg-org-phone i { margin: 0 2px; font-style: normal; color: #777; }
+.mg-org-phone a { color: inherit; text-decoration: none; white-space: nowrap; }
+.mg-org-phone a:hover { color: #a10f18; text-decoration: underline; }
+.mg-org-stores { margin-top: 62px; }
+.mg-org-stores::before { position: absolute; top: -28px; right: 8.3%; left: 8.3%; border-top: 2px solid #646464; content: ''; }
+.mg-org-stores::after { position: absolute; bottom: 100%; left: 50%; height: 34px; border-left: 2px solid #646464; content: ''; }
+.mg-org-store::before { position: absolute; bottom: 100%; left: 50%; height: 28px; border-left: 2px solid #646464; content: ''; }
+.mg-org-group { padding-bottom: 5px; }
+.mg-org-group + .mg-org-group { border-top: 1px solid var(--org-border); }
+.mg-org-group h4 { margin: 0; padding: 5px 3px; background: color-mix(in srgb, var(--org-head) 68%, white); color: #222; font-family: 'Roboto', Arial, sans-serif; font-size: 13px; font-weight: 800; }
+.mg-org-tone-0 { --org-border: #48a6d2; --org-bg: #e9f7fc; --org-head: #c6e8f5; }
+.mg-org-tone-1 { --org-border: #42a96c; --org-bg: #e9f8ee; --org-head: #caefd5; }
+.mg-org-tone-2 { --org-border: #d6b437; --org-bg: #fff9df; --org-head: #ffefad; }
+.mg-org-tone-3 { --org-border: #d66f62; --org-bg: #fff0ed; --org-head: #f8d4ce; }
+.mg-org-tone-4 { --org-border: #9561c2; --org-bg: #f5edfc; --org-head: #e4d2f4; }
+.mg-org-tone-5 { --org-border: #3eb7b3; --org-bg: #e7fafa; --org-head: #c8f0ee; }
+@media (max-width: 700px) {
+  .mg-org-section { padding: 16px 12px; }
+  .mg-org-heading { align-items: flex-start; }
+  .mg-org-heading .mg-button { flex-shrink: 0; }
+}
+.mg-source-marker > span, .mg-source-badge, .mg-source-badge.is-api {
+  color: #a10f18;
+  background: #fae8e9;
+  border-color: #e7bfc2;
+}
+.mg-avatar, .mg-avatar-1, .mg-avatar-2, .mg-avatar-3,
+.mg-user-avatar, .mg-workspace-symbol, .mg-composer-person {
+  color: #111;
+  background: #efeded;
+}
+.mg-composer-person { border: 1px solid #dedada; }
+.mg-composer-notice, .mg-composer-section legend > span {
+  color: #8f1018;
+  background: #fae8e9;
+  border-color: #e7bfc2;
+}
+.mg-toast { background: #151515; border-color: #b5121b; }
+.mg-table th, .mg-contract-preview .badge { color: #111; background: #f0eded; }
+.mg-app-footer, .mg-list-note, .mg-page-heading p, .mg-identity small,
+.mg-pagination-controls > label, .mg-page-total, .mg-dialog-header p,
+.mg-field > small, .mg-form-note, .mg-detail-grid dt,
+.mg-cashbook-panel-heading p, .mg-cashbook-panel-description { color: #383838; }
+@media (max-width: 600px) {
+  .mg-breadcrumb strong, .mg-branch-select select { font-size: 14px !important; }
+  .mg-app-footer, .mg-list-note { font-size: 14px !important; }
 }

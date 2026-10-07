@@ -33,7 +33,10 @@ export function CustomerCreateDialog({ idCard, storeId, onCreated, onClose }: { 
     setErrors(next); setError('');
     if (Object.keys(next).length) { requestAnimationFrame(() => form.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()); return; }
     busy.current = true; setSaving(true);
-    try { onCreated(await createCustomer(customer, source === 'demo' ? { status, store_id: Number(branch) } : undefined)); }
+    try {
+      const assignment = source === 'demo' ? { status, store_id: Number(branch) } : storeId ? { status: 'active', store_id: Number(storeId) } : undefined;
+      onCreated(await createCustomer(customer, assignment));
+    }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Không tạo được khách hàng. Vui lòng thử lại.'); }
     finally { busy.current = false; setSaving(false); }
   }

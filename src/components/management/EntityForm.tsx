@@ -7,7 +7,7 @@ import { useManagement } from './ManagementProvider';
 import { Dialog } from './Dialog';
 
 export function EntityForm({ config, row, onClose }: { config: ManagementConfig; row: ManagementRow | null; onClose: () => void }) {
-  const { dataset, selectedStore, save } = useManagement();
+  const { dataset, selectedStore, source, save, updateCustomer } = useManagement();
   const prefixes = { staff: 'NV', customers: 'KH', stores: 'CS', vehicles: 'XE', contracts: 'HD' };
   const [draft, setDraft] = useState<ManagementRow>(() => {
     if (row) return { ...row };
@@ -39,6 +39,7 @@ export function EntityForm({ config, row, onClose }: { config: ManagementConfig;
     }
     if (config.kind === 'vehicles' && dataset?.vehicles.some(v => v.id !== draft.id && String(v.license).trim().toUpperCase() === String(draft.license).trim().toUpperCase())) nextErrors.license = 'Biển số này đã có trong danh sách.';
     if (config.kind === 'customers' && draft.status === 'warning' && !String(draft.warning_note || '').trim()) nextErrors.warning_note = 'Nhập ghi chú cho hồ sơ cần lưu ý.';
+    if (config.kind === 'customers' && String(draft.id_card || '').trim() && !/^\d{9}$|^\d{12}$/.test(String(draft.id_card).replace(/\s+/g, ''))) nextErrors.id_card = 'CCCD/CMND phải có 9 hoặc 12 chữ số.';
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
       requestAnimationFrame(() => formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
@@ -51,12 +52,16 @@ export function EntityForm({ config, row, onClose }: { config: ManagementConfig;
       prepared[field.key] = field.type === 'number' || field.storeOptions ? (value ? Number(value) : undefined) : value;
     }
     setSaving(true); setSaveError('');
-    try { await save(config.kind, prepared); onClose(); }
-    catch (cause) { setSaveError(cause instanceof Error ? cause.message : 'Không lưu được dữ liệu mẫu.'); }
+    try {
+      if (config.kind === 'customers' && source === 'api') await updateCustomer(prepared);
+      else await save(config.kind, prepared);
+      onClose();
+    } catch (cause) { setSaveError(cause instanceof Error ? cause.message : source === 'api' ? 'Không lưu được thay đổi vào Supabase.' : 'Không lưu được dữ liệu mẫu.'); }
     finally { setSaving(false); }
   }
 
-  return <Dialog title={`${row ? 'Chỉnh sửa' : 'Thêm'} ${config.singular}`} subtitle={`${draft.code} · Dữ liệu mẫu, chỉ lưu trong phiên xem trước`} onClose={() => { if (!saving) onClose(); }}>
+  const supabaseCustomer = config.kind === 'customers' && source === 'api';
+  return <Dialog title={`${row ? 'Chỉnh sửa' : 'Thêm'} ${config.singular}`} subtitle={`${draft.code} · ${supabaseCustomer ? 'Lưu trực tiếp vào Supabase' : 'Dữ liệu mẫu, chỉ lưu trong phiên xem trước'}`} onClose={() => { if (!saving) onClose(); }}>
     <form ref={formRef} onSubmit={submit} noValidate>
       <div className="mg-dialog-body"><div className="mg-form-grid">{config.fields.map(field => {
         const options = field.storeOptions ? (dataset?.stores || []).map(store => ({ value: String(store.id), label: store.name })) : field.options;
@@ -74,7 +79,7 @@ export function EntityForm({ config, row, onClose }: { config: ManagementConfig;
         </div>;
       })}</div>{saveError && <p className="mg-error-message" role="alert">{saveError}</p>}</div>
       <div className="mg-dialog-footer"><span className="mg-form-note">* Thông tin bắt buộc</span><button className="mg-button" type="button" disabled={saving} onClick={onClose}>Hủy</button>
-        <button className="mg-button mg-button-primary" type="submit" disabled={saving}>{saving ? <LoaderCircle size={16} className="mg-spin" /> : <Check size={16} />}{saving ? 'Đang lưu…' : 'Lưu dữ liệu mẫu'}</button></div>
+        <button className="mg-button mg-button-primary" type="submit" disabled={saving}>{saving ? <LoaderCircle size={16} className="mg-spin" /> : <Check size={16} />}{saving ? 'Đang lưu…' : supabaseCustomer ? 'Lưu khách hàng' : 'Lưu dữ liệu mẫu'}</button></div>
     </form>
   </Dialog>;
 }

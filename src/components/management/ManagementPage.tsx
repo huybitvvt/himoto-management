@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowDownToLine, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Columns3, ListFilter, Plus, Printer, RotateCcw, Search, ShieldCheck, X } from 'lucide-react';
+import { ArrowDownToLine, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Columns3, ListFilter, Plus, Printer, RotateCcw, Search, ShieldCheck, Trash2, X } from 'lucide-react';
 import { MANAGEMENT_CONFIG, optionLabel, statusTone } from '@/lib/management/config';
 import { EMPTY_QUERY, TableQuery, csvCell, filterRows, formatValue, sortRows } from '@/lib/management/table-utils';
 import { ManagementKind, ManagementRow } from '@/lib/management/types';
@@ -14,12 +14,14 @@ import { EntityForm } from './EntityForm';
 import { ContractDetail } from './ContractDetail';
 import { rentalModuleUrl } from '@/lib/management/links';
 import { ContractComposer } from '@/components/contracts/ContractComposer';
+import { CustomerCreateDialog } from '@/components/contracts/CustomerCreateDialog';
+import { StaffOrganizationChart } from './StaffOrganizationChart';
 
 const EMPTY_ROWS: ManagementRow[] = [];
 
 function ManagementContent({ kind }: { kind: ManagementKind }) {
   const config = MANAGEMENT_CONFIG[kind];
-  const { dataset, loading, error, source, selectedStore, selectStore, reload, notify, cloneContract } = useManagement();
+  const { dataset, loading, error, source, selectedStore, selectStore, reload, notify, cloneContract, deleteCustomer } = useManagement();
   const router = useRouter();
   const searchParams = useSearchParams();
   const customerId = kind === 'contracts' ? searchParams.get('customer_id') : null;
@@ -31,6 +33,10 @@ function ManagementContent({ kind }: { kind: ManagementKind }) {
   const [viewing, setViewing] = useState<ManagementRow | null>(null);
   const [editing, setEditing] = useState<ManagementRow | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [createCustomerOpen, setCreateCustomerOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ManagementRow | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const [composerOpen, setComposerOpen] = useState(false);
   const [printRow, setPrintRow] = useState<ManagementRow | null>(null);
   const [composerMode, setComposerMode] = useState<'print' | 'edit'>('print');
@@ -60,7 +66,8 @@ function ManagementContent({ kind }: { kind: ManagementKind }) {
   const columns = config.columns.filter(c => visibleKeys.includes(c.key));
   const statusOptions = [...config.statuses, ...Array.from(new Set(rows.map(row => row.status))).filter(status => status && !config.statuses.some(option => option.value === status)).map(value => ({ value, label: kind === 'contracts' ? optionLabel(config, 'status', value) : `Trạng thái ${value}` }))];
   const isFiltered = Boolean(query.search || query.status || query.startDate || query.endDate || selectedStore !== 'all' || Object.values(query.filters).some(Boolean));
-  const canEdit = source === 'demo' && kind !== 'contracts';
+  const canEdit = (source === 'demo' && kind !== 'contracts') || (source === 'api' && kind === 'customers');
+  const canDelete = source === 'api' && kind === 'customers';
   const invalidDate = Boolean(query.startDate && query.endDate && query.startDate > query.endDate);
   const updateQuery = (next: Partial<TableQuery>) => { setQuery(current => ({ ...current, ...next })); setPage(1); };
 
@@ -96,9 +103,14 @@ function ManagementContent({ kind }: { kind: ManagementKind }) {
     <div className="mg-page-content">
       <div className="mg-page-heading"><div><div className="mg-eyebrow">DANH MỤC QUẢN LÝ <span>/</span> {String(navigationNumber(kind)).padStart(2, '0')}</div><h1>{config.title}<span className="mg-title-count">{loading || error ? '—' : scopedRows.length}</span></h1><p>{config.description}</p></div>
         <div className="mg-heading-actions"><button type="button" className="mg-button" onClick={exportCsv} disabled={loading || Boolean(error) || !filteredRows.length}><ArrowDownToLine size={17} />Xuất CSV</button>
-          {canEdit && <button type="button" className="mg-button mg-button-primary" disabled={loading || Boolean(error)} onClick={() => { setEditing(null); setFormOpen(true); }}><Plus size={18} />{config.addLabel}</button>}
+          {canEdit && <button type="button" className="mg-button mg-button-primary" disabled={loading || Boolean(error)} onClick={() => {
+            if (kind === 'customers' && source === 'api') setCreateCustomerOpen(true);
+            else { setEditing(null); setFormOpen(true); }
+          }}><Plus size={18} />{config.addLabel}</button>}
           {kind === 'contracts' && <>{source === 'api' && <span className="mg-readonly"><ShieldCheck size={16} />Danh sách chỉ đọc</span>}<button type="button" className="mg-button mg-button-primary" disabled={loading || Boolean(error) || !dataset} onClick={() => { setPrintRow(null); setComposerMode('print'); setComposerOpen(true); }}><Printer size={17} />Điền và in hợp đồng</button></>}</div>
       </div>
+
+      {kind === 'staff' && <StaffOrganizationChart />}
 
       <div className="mg-data-panel">
         <div className="mg-status-tabs" aria-label="Lọc theo trạng thái"><button type="button" className={!query.status ? 'is-active' : ''} aria-pressed={!query.status} onClick={() => updateQuery({ status: '' })}>Tất cả<span>{tabRows.length}</span></button>
@@ -115,6 +127,7 @@ function ManagementContent({ kind }: { kind: ManagementKind }) {
         {cloneError && <p className="mg-error-message" role="alert">{cloneError}</p>}
         <DataTable config={config} columns={columns} rows={filteredRows.slice(offset, offset + pageSize)} offset={offset} sortKey={sort.key} sortDirection={sort.direction}
           onSort={key => { setSort(current => ({ key, direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc' })); setPage(1); }} onView={view} onEdit={row => { if (kind === 'contracts') { setPrintRow(row); setComposerMode('edit'); setComposerOpen(true); } else { setEditing(row); setFormOpen(true); } }}
+          onDelete={canDelete ? row => { setDeleteTarget(row); setDeleteError(''); } : undefined} canDelete={canDelete}
           onPrint={kind === 'contracts' ? row => { setPrintRow(row); setComposerMode('print'); setComposerOpen(true); } : undefined}
           onClone={kind === 'contracts' && source === 'demo' ? row => void copyContract(row) : undefined} cloningId={cloningId}
           canEditContract={kind === 'contracts' && source === 'demo'}
@@ -126,9 +139,20 @@ function ManagementContent({ kind }: { kind: ManagementKind }) {
           </div>
         </div>
       </div>
-      <div className="mg-list-note"><span className="mg-note-line" />{kind === 'contracts' ? 'Thao tác thuê xe và thanh toán được xử lý tại module đơn thuê xe hiện có.' : source === 'demo' ? 'Bạn đang xem dữ liệu minh họa. Thêm và chỉnh sửa không ảnh hưởng dữ liệu thật.' : 'Các trường chưa được API cung cấp hiển thị “—”. Danh sách hiện chỉ đọc.'}</div>
+      <div className="mg-list-note"><span className="mg-note-line" />{kind === 'contracts' ? 'Thao tác thuê xe và thanh toán được xử lý tại module đơn thuê xe hiện có.' : kind === 'customers' && source === 'api' ? 'Dữ liệu khách hàng được đọc và cập nhật trực tiếp trong Supabase. Hồ sơ có đơn thuê liên quan sẽ được bảo vệ khỏi thao tác xóa.' : source === 'demo' ? 'Bạn đang xem dữ liệu minh họa. Thêm và chỉnh sửa không ảnh hưởng dữ liệu thật.' : 'Các trường chưa được API cung cấp hiển thị “—”. Danh sách hiện chỉ đọc.'}</div>
     </div>
     {formOpen && <EntityForm config={config} row={editing} onClose={() => setFormOpen(false)} />}
+    {createCustomerOpen && kind === 'customers' && <CustomerCreateDialog idCard="" onCreated={() => setCreateCustomerOpen(false)} onClose={() => setCreateCustomerOpen(false)} />}
+    {deleteTarget && kind === 'customers' && <Dialog title="Xóa hồ sơ khách hàng?" subtitle={`${deleteTarget.name} · ${deleteTarget.code}`} onClose={() => { if (!deleteBusy) { setDeleteTarget(null); setDeleteError(''); } }}>
+      <div className="mg-dialog-body"><p>Thao tác này sẽ xóa hồ sơ khách hàng khỏi Supabase. Hồ sơ đang được dùng trong đơn thuê sẽ không thể xóa để bảo toàn lịch sử.</p>{deleteError && <p className="mg-error-message" role="alert">{deleteError}</p>}</div>
+      <div className="mg-dialog-footer"><button type="button" className="mg-button" disabled={deleteBusy} onClick={() => setDeleteTarget(null)}>Hủy</button><button type="button" className="mg-button mg-button-danger" disabled={deleteBusy} onClick={async () => {
+        if (!deleteTarget || deleteBusy) return;
+        setDeleteBusy(true); setDeleteError('');
+        try { await deleteCustomer(deleteTarget.id); setDeleteTarget(null); }
+        catch (cause) { setDeleteError(cause instanceof Error ? cause.message : 'Không xóa được hồ sơ khách hàng.'); }
+        finally { setDeleteBusy(false); }
+      }}>{deleteBusy ? 'Đang xóa…' : <><Trash2 size={16} />Xóa khách hàng</>}</button></div>
+    </Dialog>}
     {viewing && kind === 'contracts' && <ContractDetail row={viewing} onClose={() => setViewing(null)} />}
     {composerOpen && dataset && <ContractComposer key={`${composerMode}-${printRow?.id || 'new'}`} row={printRow} mode={composerMode} onClose={() => setComposerOpen(false)} />}
     {viewing && kind !== 'contracts' && <Dialog title={String(viewing.name)} subtitle={`${viewing.code} · ${config.title}`} onClose={() => setViewing(null)}>

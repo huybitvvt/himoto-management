@@ -1,0 +1,321 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { himotoPool } from '@/lib/server/himoto-database';
+
+export const runtime = 'nodejs';
+
+type Params = { params: Promise<{ path: string[] }> };
+type QueryConfig = { sql: string };
+
+const listQueries: Record<string, QueryConfig> = {
+  'hr/staff': {
+    sql: `SELECT p.id, p.staff_code, p.full_name, p.phone, p.email, p.position,
+                 p.store_id, s.store_name, p.status, p.joined_at
+          FROM himoto.staff_profiles p
+          LEFT JOIN himoto.stores s ON s.id = p.store_id
+          ORDER BY p.id DESC`,
+  },
+  customers: {
+    sql: `SELECT c.id, c.name, c.email, c.phone, c.address, c.id_card,
+                 CASE WHEN c.status = 2 THEN 'bad_debt' WHEN NULLIF(BTRIM(c.warning), '') IS NOT NULL THEN 'warning'
+                      WHEN c.status = 0 THEN 'draft' ELSE 'active' END AS status,
+                 c.warning, c.created_at, c.id_card_issued_on, c.id_card_issued_by, c.relatives,
+                 c.store_id, s.store_name,
+                 (SELECT count(*)::int FROM himoto.orders o WHERE o.customer_id = c.id AND o.deleted_at IS NULL) AS contract_count
+          FROM himoto.customers c
+          LEFT JOIN himoto.stores s ON s.id = c.store_id
+          ORDER BY c.id DESC`,
+  },
+  stores: {
+    sql: `SELECT s.id, s.code, s.store_name, s.store_phone, s.store_address, s.status,
+                 u.name AS manager_name,
+                 (SELECT count(*)::int FROM himoto.vehicles v WHERE v.current_store_id = s.id) AS vehicle_count,
+                 (SELECT count(*)::int FROM himoto.staff_profiles p WHERE p.store_id = s.id) AS staff_count
+          FROM himoto.stores s
+          LEFT JOIN himoto.users u ON u.id = s.user_id AND u.deleted_at IS NULL
+          ORDER BY s.id`,
+  },
+  'vehicle/vehicles': {
+    sql: `SELECT v.id, v.name, v.brand, v.type, v.year, v.status, v.license, v.odometer,
+                 v.current_store_id, s.store_name
+          FROM himoto.vehicles v
+          LEFT JOIN himoto.stores s ON s.id = v.current_store_id
+          ORDER BY v.id DESC`,
+  },
+  'order/car-rental': {
+    sql: `SELECT o.id, o.contract_number, o.order_type AS rental_type, o.order_status AS status,
+                 o.customer_id, COALESCE(c.name, o.customer_name) AS customer_name,
+                 COALESCE(c.phone, o.customer_phone) AS customer_phone,
+                 o.store_id, s.store_name, o.rent_at AS start_date, o.return_at AS end_date,
+                 o.total AS total_amount,
+                 CASE WHEN o.first_deposit_amount IS NULL AND o.additional_deposit_amount IS NULL THEN NULL
+                      ELSE COALESCE(o.first_deposit_amount, 0) + COALESCE(o.additional_deposit_amount, 0) END AS deposit_amount,
+                 o.note AS notes, o.contract_responsible_user_id AS staff_id,
+                 COALESCE(ov.vehicles, '[]'::json) AS vehicles
+          FROM himoto.orders o
+          LEFT JOIN himoto.customers c ON c.id = o.customer_id
+          LEFT JOIN himoto.stores s ON s.id = o.store_id
+          LEFT JOIN LATERAL (
+            SELECT json_agg(json_build_object('id', v.id, 'name', v.name, 'license', v.license) ORDER BY d.id) AS vehicles
+            FROM himoto.order_vehicle_details d
+            LEFT JOIN himoto.vehicles v ON v.id = d.vehicle_id
+            WHERE d.order_id = o.id AND d.deleted_at IS NULL
+          ) ov ON true
+          WHERE o.deleted_at IS NULL
+          ORDER BY o.id DESC`,
+  },
+  transactions: {
+    sql: `SELECT t.id, t.created_at, t.type, t.user_id, u.name AS user_name, t.store_id,
+                 t.name AS reason, COALESCE(t."desc", t.note) AS content
+          FROM himoto.transactions t
+          LEFT JOIN himoto.users u ON u.id = t.user_id
+          ORDER BY t.id DESC`,
+  },
+};
+
+async function readAll(query: QueryConfig) {
+  const data = await himotoPool.query(query.sql);
+  // The UI filters and sorts locally, so return each current dataset in one
+  // response instead of making dozens of sequential page requests.
+  return NextResponse.json({ status: 'success', data: data.rows });
+}
+
+export async function GET(request: NextRequest, { params }: Params) {
+  // This local integration has no application login yet. Never expose these
+  // database-backed routes from a production deployment without adding auth.
+  if (process.env.NODE_ENV !== 'development') return NextResponse.json({ status: 'error' }, { status: 404 });
+
+  const { path } = await params;
+  const key = path.join('/');
+  try {
+    if (key === 'customers/search-by-id-card') {
+      const idCard = request.nextUrl.searchParams.get('id_card')?.replace(/\s+/g, '') || '';
+      const result = await himotoPool.query(
+        `SELECT c.id, c.name, c.email, c.phone, c.address, c.id_card, c.status::text AS status,
+                c.warning, c.created_at, c.id_card_issued_on, c.id_card_issued_by, c.relatives,
+                c.store_id, s.store_name
+         FROM himoto.customers c LEFT JOIN himoto.stores s ON s.id = c.store_id
+         WHERE regexp_replace(COALESCE(c.id_card, ''), '\\s+', '', 'g') = $1 LIMIT 2`,
+        [idCard],
+      );
+      if (result.rows.length > 1) return NextResponse.json({ status: 'error', message: 'Có nhiều hồ sơ trùng giấy tờ.' }, { status: 409 });
+      return NextResponse.json({ status: 'success', data: result.rows[0] || null });
+    }
+    if (key === 'customers/search') {
+      const query = request.nextUrl.searchParams.get('query')?.replace(/\D/g, '') || '';
+      const storeId = Number(request.nextUrl.searchParams.get('store_id'));
+      if (query.length < 9 || query.length > 13 || !Number.isSafeInteger(storeId) || storeId <= 0) return NextResponse.json({ status: 'success', data: [] });
+      const result = await himotoPool.query(
+        `SELECT c.id, c.name, c.email, c.phone, c.address, c.id_card,
+                CASE WHEN c.status = 2 THEN 'bad_debt' WHEN NULLIF(BTRIM(c.warning), '') IS NOT NULL THEN 'warning'
+                     WHEN c.status = 0 THEN 'draft' ELSE 'active' END AS status,
+                c.warning AS warning_note, c.created_at, c.id_card_issued_on, c.id_card_issued_by,
+                c.relatives, c.store_id, s.store_name
+         FROM himoto.customers c LEFT JOIN himoto.stores s ON s.id = c.store_id
+         WHERE (c.store_id = $2 OR (c.store_id IS NULL AND EXISTS (
+                  SELECT 1 FROM himoto.orders o WHERE o.customer_id = c.id AND o.store_id = $2 AND o.deleted_at IS NULL
+                )))
+           AND (regexp_replace(COALESCE(c.id_card, ''), '\\D', '', 'g') = $1
+             OR regexp_replace(COALESCE(c.phone, ''), '\\D', '', 'g') = $1)
+         ORDER BY c.id DESC LIMIT 25`, [query, storeId],
+      );
+      return NextResponse.json({ status: 'success', data: result.rows });
+    }
+    const query = listQueries[key];
+    if (!query) return NextResponse.json({ status: 'error' }, { status: 404 });
+    return await readAll(query);
+  } catch (error) {
+    console.error('Supabase read failed:', error instanceof Error ? error.message : 'Unknown database error');
+    return NextResponse.json({ status: 'error', message: 'Không tải được dữ liệu từ Supabase.' }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest, { params }: Params) {
+  if (process.env.NODE_ENV !== 'development') return NextResponse.json({ status: 'error' }, { status: 404 });
+  const { path } = await params;
+  if (path.join('/') === 'hr/staff/refill-branches') {
+    try {
+      const result = await himotoPool.query(
+        `WITH assignment(phone, store_name) AS (VALUES
+           ('0376541118', 'CS 2'), ('0775284212', 'CS 2'), ('0325518898', 'CS 2'), ('0706355781', 'CS 2'),
+           ('0395505622', 'CS láng'), ('0394566430', 'CS láng'), ('0348444989', 'CS láng'),
+           ('0378784066', 'CS 3'), ('0325378569', 'CS 3'),
+           ('0974992405', 'CS 5'), ('0355403060', 'CS 5'), ('0386125866', 'CS 5'),
+           ('0396589623', 'CH Giáp Bát'), ('0333648392', 'CH Giáp Bát'), ('0963165055', 'CH Giáp Bát'), ('0778430858', 'CH Giáp Bát'),
+           ('0988296110', 'Kho sở hữu')
+         ), targets AS (
+           SELECT p.id, s.id AS store_id
+           FROM himoto.staff_profiles p
+           JOIN assignment a ON regexp_replace(COALESCE(p.phone, ''), '\\D', '', 'g') = a.phone
+           JOIN himoto.stores s ON lower(btrim(s.store_name)) = lower(a.store_name)
+         ), updated AS (
+           UPDATE himoto.staff_profiles p SET store_id = t.store_id
+           FROM targets t WHERE p.id = t.id AND p.store_id IS DISTINCT FROM t.store_id
+           RETURNING p.id
+         )
+         SELECT (SELECT count(*)::int FROM targets) AS matched,
+                (SELECT count(*)::int FROM updated) AS updated`,
+      );
+      return NextResponse.json({ status: 'success', data: result.rows[0] });
+    } catch (error) {
+      console.error('Supabase staff branch refill failed:', error instanceof Error ? error.message : 'Unknown database error');
+      return NextResponse.json({ status: 'error', message: 'Không điền lại được cơ sở nhân sự vào Supabase.' }, { status: 500 });
+    }
+  }
+  if (path.join('/') !== 'customers') return NextResponse.json({ status: 'error' }, { status: 404 });
+
+  let body: Record<string, unknown>;
+  try {
+    const parsed: unknown = await request.json();
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('invalid body');
+    body = parsed as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ status: 'error', message: 'Thông tin khách hàng không hợp lệ.' }, { status: 400 });
+  }
+
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
+  const email = typeof body.email === 'string' ? body.email.trim() : '';
+  const address = typeof body.address === 'string' ? body.address.trim() : '';
+  const idCard = typeof body.id_card === 'string' ? body.id_card.replace(/\s+/g, '') : '';
+  const storeId = body.store_id == null || body.store_id === '' ? null : Number(body.store_id);
+  const status = String(body.status || 'active');
+  if (!name || !address || !/^\+?\d{9,13}$/.test(phone.replace(/[\s.()-]/g, '')) || !/^\d{9}$|^\d{12}$/.test(idCard) ||
+      (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) || !['active', 'warning', 'blacklist', 'draft'].includes(status) ||
+      (storeId !== null && (!Number.isInteger(storeId) || storeId <= 0))) {
+    return NextResponse.json({ status: 'error', message: 'Kiểm tra họ tên, điện thoại, CCCD/CMND, địa chỉ và email.' }, { status: 400 });
+  }
+
+  const client = await himotoPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [idCard]);
+    const duplicate = await client.query(
+      `SELECT id FROM himoto.customers
+       WHERE regexp_replace(COALESCE(id_card, ''), '\\s+', '', 'g') = $1 LIMIT 1`,
+      [idCard],
+    );
+    if (duplicate.rowCount) {
+      await client.query('ROLLBACK');
+      return NextResponse.json({ status: 'error', message: 'Số CCCD/CMND này đã có trong danh sách khách hàng.' }, { status: 409 });
+    }
+    const result = await client.query(
+      `INSERT INTO himoto.customers (name, phone, email, address, id_card, status, store_id, created_at, updated_at)
+       VALUES ($1, $2, NULLIF($3, ''), $4, $5, $6, $7, now(), now())
+       RETURNING id, name, phone, email, address, id_card,
+                 CASE WHEN status = 2 THEN 'bad_debt' WHEN NULLIF(BTRIM(warning), '') IS NOT NULL THEN 'warning'
+                      WHEN status = 0 THEN 'draft' ELSE 'active' END AS status,
+                 warning, created_at, id_card_issued_on, id_card_issued_by, relatives, store_id`,
+      [name, phone, email, address, idCard, status === 'blacklist' ? 2 : status === 'draft' ? 0 : 1, storeId],
+    );
+    await client.query('COMMIT');
+    return NextResponse.json({ status: 'success', data: result.rows[0] }, { status: 201 });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Supabase customer insert failed:', error instanceof Error ? error.message : 'Unknown database error');
+    return NextResponse.json({ status: 'error', message: 'Không lưu được khách hàng vào Supabase.' }, { status: 500 });
+  } finally {
+    client.release();
+  }
+}
+
+async function getCustomerId(params: Params['params']) {
+  const { path } = await params;
+  if (path.length !== 2 || path[0] !== 'customers' || !/^\d+$/.test(path[1])) return null;
+  const id = Number(path[1]);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+export async function PATCH(request: NextRequest, { params }: Params) {
+  if (process.env.NODE_ENV !== 'development') return NextResponse.json({ status: 'error' }, { status: 404 });
+  const id = await getCustomerId(params);
+  if (!id) return NextResponse.json({ status: 'error', message: 'Mã khách hàng không hợp lệ.' }, { status: 400 });
+
+  let body: Record<string, unknown>;
+  try {
+    const parsed: unknown = await request.json();
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('invalid body');
+    body = parsed as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ status: 'error', message: 'Thông tin khách hàng không hợp lệ.' }, { status: 400 });
+  }
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
+  const email = typeof body.email === 'string' ? body.email.trim() : '';
+  const address = typeof body.address === 'string' ? body.address.trim() : '';
+  const idCard = typeof body.id_card === 'string' ? body.id_card.replace(/\s+/g, '') : '';
+  const warning = typeof body.warning_note === 'string' ? body.warning_note.trim() : '';
+  const storeId = body.store_id == null || body.store_id === '' ? null : Number(body.store_id);
+  const status = String(body.status || '');
+  if (!name || !/^\+?\d{9,13}$/.test(phone.replace(/[\s.()-]/g, '')) || (idCard && !/^\d{9}$|^\d{12}$/.test(idCard)) ||
+      (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) || !['active', 'warning', 'blacklist', 'draft'].includes(status) ||
+      (status === 'warning' && !warning) || (storeId !== null && (!Number.isInteger(storeId) || storeId <= 0))) {
+    return NextResponse.json({ status: 'error', message: 'Kiểm tra họ tên, số điện thoại, giấy tờ, email, cơ sở và trạng thái hồ sơ.' }, { status: 400 });
+  }
+
+  const client = await himotoPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`customer:${idCard || `id:${id}`}`]);
+    const duplicate = idCard ? await client.query(
+      `SELECT id FROM himoto.customers WHERE id <> $1 AND regexp_replace(COALESCE(id_card, ''), '\\s+', '', 'g') = $2 LIMIT 1`, [id, idCard],
+    ) : { rowCount: 0 };
+    if (duplicate.rowCount) {
+      await client.query('ROLLBACK');
+      return NextResponse.json({ status: 'error', message: 'Số CCCD/CMND này đã thuộc hồ sơ khách hàng khác.' }, { status: 409 });
+    }
+    const dbStatus = status === 'blacklist' ? 2 : status === 'draft' ? 0 : 1;
+    const dbWarning = status === 'blacklist' ? warning || 'Blacklist' : status === 'warning' ? warning : null;
+    const result = await client.query(
+      `UPDATE himoto.customers SET name=$2, phone=$3, email=NULLIF($4,''), address=NULLIF($5,''),
+         id_card=NULLIF($6,''), status=$7, warning=$8, store_id=$9, updated_at=now()
+       WHERE id=$1
+       RETURNING id, name, email, phone, address, id_card,
+         CASE WHEN status = 2 THEN 'bad_debt' WHEN NULLIF(BTRIM(warning), '') IS NOT NULL THEN 'warning'
+              WHEN status = 0 THEN 'draft' ELSE 'active' END AS status,
+         warning AS warning_note, created_at, id_card_issued_on, id_card_issued_by, relatives, store_id`,
+      [id, name, phone, email, address, idCard, dbStatus, dbWarning, storeId],
+    );
+    if (!result.rowCount) {
+      await client.query('ROLLBACK');
+      return NextResponse.json({ status: 'error', message: 'Không tìm thấy khách hàng cần cập nhật.' }, { status: 404 });
+    }
+    await client.query('COMMIT');
+    return NextResponse.json({ status: 'success', data: result.rows[0] });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Supabase customer update failed:', error instanceof Error ? error.message : 'Unknown database error');
+    return NextResponse.json({ status: 'error', message: 'Không lưu được thay đổi khách hàng vào Supabase.' }, { status: 500 });
+  } finally {
+    client.release();
+  }
+}
+
+export async function DELETE(_request: NextRequest, { params }: Params) {
+  if (process.env.NODE_ENV !== 'development') return NextResponse.json({ status: 'error' }, { status: 404 });
+  const id = await getCustomerId(params);
+  if (!id) return NextResponse.json({ status: 'error', message: 'Mã khách hàng không hợp lệ.' }, { status: 400 });
+  const client = await himotoPool.connect();
+  try {
+    await client.query('BEGIN');
+    const customer = await client.query('SELECT id FROM himoto.customers WHERE id=$1 FOR UPDATE', [id]);
+    if (!customer.rowCount) {
+      await client.query('ROLLBACK');
+      return NextResponse.json({ status: 'error', message: 'Không tìm thấy khách hàng cần xóa.' }, { status: 404 });
+    }
+    const linkedOrders = await client.query('SELECT count(*)::int AS count FROM himoto.orders WHERE customer_id=$1', [id]);
+    const count = Number(linkedOrders.rows[0]?.count || 0);
+    if (count > 0) {
+      await client.query('ROLLBACK');
+      return NextResponse.json({ status: 'error', message: `Không thể xóa hồ sơ này vì đang liên kết với ${count} đơn thuê. Hãy giữ lại hồ sơ để bảo toàn lịch sử hợp đồng.` }, { status: 409 });
+    }
+    await client.query('DELETE FROM himoto.customers WHERE id=$1', [id]);
+    await client.query('COMMIT');
+    return NextResponse.json({ status: 'success', data: null });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Supabase customer delete failed:', error instanceof Error ? error.message : 'Unknown database error');
+    return NextResponse.json({ status: 'error', message: 'Không xóa được hồ sơ khách hàng.' }, { status: 500 });
+  } finally {
+    client.release();
+  }
+}
