@@ -20,5 +20,16 @@ function createPool() {
   });
 }
 
-export const himotoPool = globalForDatabase.himotoPool ?? createPool();
-if (process.env.NODE_ENV !== 'production') globalForDatabase.himotoPool = himotoPool;
+let pool = globalForDatabase.himotoPool;
+function getPool() {
+  pool ??= createPool();
+  if (process.env.NODE_ENV !== 'production') globalForDatabase.himotoPool = pool;
+  return pool;
+}
+
+// Resolve credentials only when a permitted local handler uses the database.
+// Production handlers return 404 before requesting a connection.
+export const himotoPool: Pick<Pool, 'query' | 'connect'> = {
+  get query() { return getPool().query.bind(getPool()); },
+  get connect() { return getPool().connect.bind(getPool()); },
+};

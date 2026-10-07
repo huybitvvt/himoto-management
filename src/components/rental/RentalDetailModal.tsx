@@ -9,6 +9,8 @@ interface RentalDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   onPrint: (order: RentalOrderItem) => void;
+  statusLabel?: string;
+  missingAmounts?: { deposit: boolean; total: boolean };
 }
 
 export const RentalDetailModal: React.FC<RentalDetailModalProps> = ({
@@ -16,6 +18,8 @@ export const RentalDetailModal: React.FC<RentalDetailModalProps> = ({
   isOpen,
   onClose,
   onPrint,
+  statusLabel,
+  missingAmounts,
 }) => {
   if (!isOpen || !order) return null;
 
@@ -30,7 +34,7 @@ export const RentalDetailModal: React.FC<RentalDetailModalProps> = ({
               <h5 className="modal-title font-weight-bold mb-1">
                 Chi tiết hợp đồng: {order.contract_number}
               </h5>
-              <span className={`badge ${badge.badgeClass}`}>{badge.label}</span>
+              <span className={`badge ${badge.badgeClass}`}>{statusLabel || badge.label}</span>
             </div>
             <button type="button" className="close" onClick={onClose} aria-label="Đóng">
               <span aria-hidden="true">&times;</span>
@@ -60,8 +64,8 @@ export const RentalDetailModal: React.FC<RentalDetailModalProps> = ({
                   <div>Bắt đầu: <strong>{formatDateTime(order.start_date)}</strong></div>
                   <div>Hẹn trả: <strong>{formatDateTime(order.end_date)}</strong></div>
                   <div className="mt-2 pt-2 border-top">
-                    <div>Tiền cọc: <strong className="text-dark">{formatMoney(order.deposit_amount)}</strong></div>
-                    <div>Tổng tiền thuê: <strong className="text-success font-size-lg">{formatMoney(order.total_amount)}</strong></div>
+                    <div>Tiền cọc: <strong className="text-dark">{missingAmounts?.deposit ? '—' : formatMoney(order.deposit_amount)}</strong></div>
+                    <div>Tổng tiền thuê: <strong className="text-success font-size-lg">{missingAmounts?.total ? '—' : formatMoney(order.total_amount)}</strong></div>
                   </div>
                 </div>
               </div>

@@ -162,7 +162,7 @@ with sync_playwright() as p:
     form = edit('HD-2610-033')
     form.get_by_label('CCCD / CMND', exact=False).fill('009876543210')
     expect(form.locator('.mg-lookup-status')).to_contain_text('Chưa có khách hàng')
-    form.get_by_role('button', name='Thêm khách hàng tại đây', exact=True).click()
+    form.get_by_role('button', name='Thêm mới', exact=True).click()
     popup = page.get_by_role('dialog', name='Thêm khách hàng tại chỗ', exact=True)
     popup.get_by_label('Họ và tên', exact=False).fill('Khách popup Blacklist')
     popup.get_by_label('Số điện thoại', exact=False).fill('0900001234')

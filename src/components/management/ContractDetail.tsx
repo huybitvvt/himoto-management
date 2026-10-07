@@ -1,18 +1,16 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
 import { RentalDetailModal } from '@/components/rental/RentalDetailModal';
 import { RentalOrderItem } from '@/components/rental/RentalOrderTable';
 import { ManagementRow } from '@/lib/management/types';
-import { rentalModuleUrl } from '@/lib/management/links';
+import { MANAGEMENT_CONFIG, optionLabel } from '@/lib/management/config';
 
 /** Reuse the existing rental detail renderer; do not create another contract screen. */
-export function ContractDetail({ row, onClose }: { row: ManagementRow; onClose: () => void }) {
+export function ContractDetail({ row, onClose, onPrint }: { row: ManagementRow; onClose: () => void; onPrint: () => void }) {
   const wrapper = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
-  const router = useRouter();
   useEffect(() => {
     const previousFocus = document.activeElement as HTMLElement | null;
     const overflow = document.body.style.overflow;
@@ -43,9 +41,10 @@ export function ContractDetail({ row, onClose }: { row: ManagementRow; onClose: 
     id: row.id, contract_number: row.code, customer: { name: String(row.customer_name || ''), phone: String(row.customer_phone || '') },
     store: { name: String(row.store_name || '') }, vehicles: [{ name: String(row.vehicle_name || ''), license: String(row.license || '') }],
     start_date: String(row.start_date || ''), end_date: String(row.end_date || ''), created_at: String(row.created_at || ''),
-    // The caller only opens this legacy renderer when both amounts are present.
     deposit_amount: Number(row.deposit_amount), total_amount: Number(row.total_amount),
     status: statuses[row.status] || Number(row.status),
   };
-  return <div ref={wrapper} className="mg-contract-preview"><RentalDetailModal order={order} isOpen onClose={onClose} onPrint={() => router.push(rentalModuleUrl)} /></div>;
+  return <div ref={wrapper} className="mg-contract-preview"><RentalDetailModal order={order} isOpen onClose={onClose} onPrint={onPrint}
+    statusLabel={optionLabel(MANAGEMENT_CONFIG.contracts, 'status', row.status)}
+    missingAmounts={{ deposit: row.deposit_amount === undefined, total: row.total_amount === undefined }} /></div>;
 }

@@ -43,7 +43,7 @@ export function createApiCashbookRepository(baseUrl = '/api'): CashbookRepositor
       signal?.throwIfAborted();
       const token = typeof window !== 'undefined' ? localStorage.getItem('token') || localStorage.getItem('jwt_token') : null;
       const response = await fetch(`${baseUrl.replace(/\/$/, '')}${CASHBOOK_ENDPOINT}?${new URLSearchParams({ page: String(page), limit: '100' })}`, {
-        method: 'GET', signal, credentials: 'same-origin', headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        method: 'GET', cache: 'no-store', signal, credentials: 'same-origin', headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
       if (!response.ok) throw new Error(`Không tải được sổ quỹ (HTTP ${response.status}). Kiểm tra kết nối và quyền tra cứu.`);
       const envelope = object(await response.json());

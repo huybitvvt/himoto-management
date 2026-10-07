@@ -25,7 +25,7 @@ with sync_playwright() as p:
     page.on('request', lambda request: writes.append(request.url) if '/api/' in request.url and request.method not in ['GET', 'HEAD'] else None)
     page.goto(args.url + '/contracts', wait_until='networkidle')
     page.locator('.mg-table tbody .mg-code').first.wait_for()
-    page.get_by_role('button', name='Điền và in hợp đồng', exact=True).click()
+    page.get_by_role('button', name='Nhập hợp đồng', exact=True).click()
     form = page.locator('dialog.mg-contract-composer')
     expect(form).to_be_visible()
     expect(form.get_by_label('Nhân sự phụ trách', exact=False)).to_be_disabled()
@@ -44,9 +44,9 @@ with sync_playwright() as p:
     checks.append('branch dropdown scopes staff by ID and clears old staff and vehicle choices')
 
     identity = form.get_by_label('CCCD / CMND', exact=False)
-    identity.fill('DEMO-000001')
-    expect(form.locator('.mg-lookup-status')).to_contain_text('Đã tìm thấy khách hàng #1')
-    for label, value in [('Họ và tên', 'Phạm Ngọc Anh'), ('Số điện thoại', '0900000101'), ('Email', 'khachhang1@example.test'), ('Địa chỉ', 'Địa chỉ mẫu 1, Hà Nội'), ('Ngày sinh', '1995-05-20'), ('Ngày cấp giấy tờ', '2024-01-15'), ('Nơi cấp giấy tờ', 'Nơi cấp mẫu'), ('Thông tin người thân', 'Người thân mẫu · 0900000099')]:
+    identity.fill('DEMO-000002')
+    expect(form.locator('.mg-lookup-status')).to_contain_text('Đã tìm thấy khách hàng #2')
+    for label, value in [('Họ và tên', 'Vũ Đức Minh'), ('Số điện thoại', '0900000102'), ('Email', 'khachhang2@example.test'), ('Địa chỉ', 'Địa chỉ mẫu 2, Hà Nội'), ('Ngày sinh', '1995-05-20'), ('Ngày cấp giấy tờ', '2024-01-15'), ('Nơi cấp giấy tờ', 'Nơi cấp mẫu'), ('Thông tin người thân', 'Người thân mẫu · 0900000099')]:
         expect(form.get_by_label(label, exact=True)).to_have_value(value)
     identity.fill('001')
     expect(form.get_by_label('Họ và tên', exact=True)).to_have_value('')
@@ -63,7 +63,7 @@ with sync_playwright() as p:
         return new Promise(resolve => setTimeout(() => resolve(copy), count === 1 ? 1300 : 30));
       };
     }''')
-    identity.fill('DEMO-000001')
+    identity.fill('DEMO-000006')
     page.wait_for_timeout(450)
     identity.fill('DEMO-000002')
     expect(form.locator('.mg-lookup-status')).to_contain_text('Đã tìm thấy khách hàng #2')
@@ -74,18 +74,18 @@ with sync_playwright() as p:
 
     # A transport failure must remain an error, rather than offering a duplicate customer.
     page.evaluate('() => { window.structuredClone = () => { throw new Error("Mất kết nối kiểm thử"); }; }')
-    identity.fill('DEMO-000003')
+    identity.fill('DEMO-000010')
     expect(form.locator('.mg-lookup-status')).to_contain_text('Mất kết nối kiểm thử')
     assert form.get_by_role('button', name='Thêm khách hàng tại đây').count() == 0
     page.evaluate('() => { window.structuredClone = window.__originalClone; }')
     form.get_by_role('button', name='Tra cứu', exact=True).click()
-    expect(form.locator('.mg-lookup-status')).to_contain_text('Đã tìm thấy khách hàng #3')
+    expect(form.locator('.mg-lookup-status')).to_contain_text('Đã tìm thấy khách hàng #10')
     checks.append('lookup failures expose retry and never become a missing customer')
 
     original_url = page.url
     identity.fill('001234567890')
     expect(form.locator('.mg-lookup-status')).to_contain_text('Chưa có khách hàng')
-    form.get_by_role('button', name='Thêm khách hàng tại đây').click()
+    form.get_by_role('button', name='Thêm mới', exact=True).click()
     customer_modal = page.get_by_role('dialog', name='Thêm khách hàng tại chỗ', exact=True)
     expect(customer_modal).to_be_visible()
     expect(customer_modal.get_by_label('CCCD / CMND', exact=False)).to_have_value('001234567890')
@@ -206,7 +206,7 @@ with sync_playwright() as p:
     assert not page.evaluate('document.documentElement.scrollWidth > window.innerWidth')
     identity.fill('009876543210')
     expect(form.locator('.mg-lookup-status')).to_contain_text('Chưa có khách hàng')
-    form.get_by_role('button', name='Thêm khách hàng tại đây').click()
+    form.get_by_role('button', name='Thêm mới', exact=True).click()
     expect(customer_modal).to_be_visible()
     customer_modal.screenshot(path=str(output / 'customer-popup-375.png'))
     for _ in range(18):

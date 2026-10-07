@@ -26,7 +26,7 @@ with sync_playwright() as p:
         page.get_by_role('navigation', name='Điều hướng quản lý').get_by_role('link', name=label, exact=True).click()
         routes = {'Nhân sự': 'staff', 'Khách hàng': 'customers', 'Danh sách hợp đồng': 'contracts', 'Cơ sở': 'stores', 'Danh sách xe': 'vehicles'}
         expect(page).to_have_url(args.url + '/' + routes[label])
-        expect(page.get_by_role('heading', name=label, exact=False)).to_be_visible()
+        expect(page.get_by_role('heading', name=label, exact=False, level=1)).to_be_visible()
         page.locator('.mg-table tbody .mg-code').first.wait_for()
 
     def fill(label, value):
@@ -128,14 +128,14 @@ with sync_playwright() as p:
         expect(page.locator('.mg-table tbody tr')).to_have_count(2)
         page.get_by_role('button', name='Xóa bộ lọc', exact=True).click()
         expect(page.locator('.mg-table tbody tr')).to_have_count(10)
-        assert page.locator('.mg-heading-actions button').count() == 2
-        expect(page.get_by_role('button', name='Điền và in hợp đồng', exact=True)).to_be_visible()
+        assert page.locator('.mg-heading-actions button').count() == 3
+        expect(page.get_by_role('button', name='Nhập hợp đồng', exact=True)).to_be_visible()
         assert page.locator('.mg-row-actions button[aria-label^="Sửa"]').count() > 0
         assert page.locator('.mg-row-actions button[aria-label^="Sao chép hợp đồng"]').count() > 0
         page.get_by_role('button', name='Xem HD-2610-001', exact=True).click()
         expect(page.get_by_role('dialog')).to_be_visible()
         expect(page.get_by_role('dialog').get_by_text('Chi tiết hợp đồng: HD-2610-001')).to_be_visible()
-        assert not page.get_by_role('button', name='In hợp đồng', exact=True).is_visible()
+        expect(page.get_by_role('button', name='In hợp đồng', exact=True)).to_be_visible()
         page.keyboard.press('Escape')
         expect(page.get_by_role('dialog')).to_have_count(0)
         page.get_by_label('Từ ngày', exact=True).fill('2026-10-03')

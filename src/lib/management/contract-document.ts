@@ -9,6 +9,7 @@ export interface VehicleDetails {
   borrow_hats: string; borrow_raincoats: string; rent_at: string; return_at: string;
 }
 export interface ContractDraft {
+  customer_lookup?: string;
   contract_number: string; signed_on: string; store_id: string; staff_id: string;
   customer_id: number | null; customer: CustomerDetails; vehicles: VehicleDetails[];
   start_date: string; end_date: string; unit_price: string; total_amount: string; paid_amount: string;
@@ -49,15 +50,27 @@ export function createContractDraft(dataset: ManagementDataset, storeId: string,
     return { ...structuredClone(snapshot), contract_number: row.code };
   }
   const customer = customerDetails(row ? dataset.customers.find(item => item.id === row.customer_id) || { ...row, name: value(row.customer_name), phone: value(row.customer_phone), id_card: value(row.customer_id_card) } : null);
+  const items: Record<string, unknown>[] = row?.legacy_items_json ? JSON.parse(String(row.legacy_items_json)) : [];
+  const apiVehicles: Record<string, unknown>[] = row?.vehicles_json ? JSON.parse(String(row.vehicles_json)) : [];
+  const sourceVehicles = items.length ? items : apiVehicles;
+  const vehicles = sourceVehicles.map(item => {
+    const id = value(item.vehicle_id ?? item.id);
+    const master = dataset.vehicles.find(vehicle => String(vehicle.id) === id);
+    const details = master ? vehicleDetails(master, customer) : { ...emptyVehicle(), id, name: value(item.name), license: value(item.license) };
+    for (const key of ['driver_name', 'driver_license_number', 'borrow_hats', 'borrow_raincoats'] as const) if (item[key] != null) details[key] = value(item[key]);
+    if (item.driver_license_issued_on) details.driver_license_issued_on = dateInput(item.driver_license_issued_on);
+    return details;
+  });
   const vehicle = row ? dataset.vehicles.find(item => item.id === row.vehicle_id) : null;
-  return { contract_number: row?.code || '', signed_on: dateInput(row?.created_at) || nowDate(),
+  return { contract_number: row?.code || '', signed_on: dateInput(row?.signed_on || row?.created_at) || nowDate(),
     store_id: value(row?.store_id) || (storeId === 'all' ? '' : storeId), staff_id: value(row?.staff_id),
     customer_id: row?.customer_id ? Number(row.customer_id) : null, customer,
-    vehicles: [vehicle ? vehicleDetails(vehicle, customer) : emptyVehicle()],
+    vehicles: vehicles.length ? vehicles : [vehicle ? vehicleDetails(vehicle, customer) : emptyVehicle()],
     start_date: dateTimeInput(row?.start_date), end_date: dateTimeInput(row?.end_date),
     unit_price: value(vehicle?.daily_price), total_amount: value(row?.total_amount), paid_amount: value(row?.paid_amount),
     deposit_amount: value(row?.deposit_amount), package_name: row?.rental_type === 'monthly' ? 'Theo tháng' : 'Theo ngày',
-    payment_method: '', deposit_payment_method: '', collateral_description: '', customer_source: '', customer_source_url: '', authorization_date: '', };
+    payment_method: '', deposit_payment_method: '', collateral_description: value(row?.collateral_description),
+    customer_source: value(row?.customer_source), customer_source_url: value(row?.customer_source_url), authorization_date: dateInput(row?.authorization_date), };
 }
 export function normalizeIdCard(input: string) { return input.trim().replace(/\s/g, '').toUpperCase(); }
 export function validIdCard(input: string, source: 'demo' | 'api') {

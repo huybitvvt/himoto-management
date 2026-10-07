@@ -7,16 +7,19 @@ import { useManagement } from '@/components/management/ManagementProvider';
 import { ContractDraft, CustomerDetails, LegacyContractDocument, buildContractDocument, createContractDraft, customerDetails, emptyVehicle, normalizeIdCard, staffIsAvailable, staffMatchesStore, validateContractDraft, vehicleDetails } from '@/lib/management/contract-document';
 import { ManagementRow } from '@/lib/management/types';
 import { CONTRACT_STATUSES, CONTRACT_TYPES } from '@/lib/management/config';
+import { validateDraftSave } from '@/lib/management/contract-drafts';
 import { CustomerCreateDialog } from './CustomerCreateDialog';
 import { ContractPrintPreview } from './ContractPrintPreview';
 
 type LookupState = 'idle' | 'loading' | 'found' | 'matches' | 'missing' | 'error';
-export function ContractComposer({ row, mode = 'print', onClose }: { row?: ManagementRow | null; mode?: 'print' | 'edit'; onClose: () => void }) {
-  const { dataset, selectedStore, source, contractAutofill, saveContract } = useManagement();
+export function ContractComposer({ row, mode = 'print', onClose, onDraftSaved }: { row?: ManagementRow | null; mode?: 'print' | 'edit' | 'draft'; onClose: () => void; onDraftSaved?: () => void }) {
+  const { dataset, selectedStore, source, canSaveContractDrafts, contractAutofill, saveContract, saveContractDraft } = useManagement();
+  const editingDraft = mode === 'draft' || row?.status === 'draft';
+  const canSaveDraft = !row || row.status === 'draft';
   const [draft, setDraft] = useState<ContractDraft>(() => createContractDraft(dataset!, selectedStore, row));
-  const [idInput, setIdInput] = useState(draft.customer.id_card);
-  const preserveCustomer = useRef(Boolean(row?.draft_json));
-  const [lookupState, setLookupState] = useState<LookupState>(row?.draft_json ? 'found' : 'idle');
+  const [idInput, setIdInput] = useState(draft.customer_lookup ?? draft.customer.id_card);
+  const preserveCustomer = useRef(Boolean((row?.draft_json || row?.status === 'draft') && draft.customer_id));
+  const [lookupState, setLookupState] = useState<LookupState>((row?.draft_json || row?.status === 'draft') && draft.customer_id ? 'found' : 'idle');
   const [status, setStatus] = useState(row?.status || 'pending');
   const [rentalType, setRentalType] = useState(String(row?.rental_type || 'daily'));
   const [notes, setNotes] = useState(String(row?.notes || ''));
@@ -108,14 +111,25 @@ export function ContractComposer({ row, mode = 'print', onClose }: { row?: Manag
     event.preventDefault();
     if (!dataset || busy.current) return;
     const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    const savingDraft = (submitter instanceof HTMLButtonElement && submitter.value === 'draft') || (editingDraft && !(submitter instanceof HTMLButtonElement && submitter.value === 'preview'));
     const savingRecord = mode === 'edit' && !(submitter instanceof HTMLButtonElement && submitter.value === 'preview');
-    const next = validateContractDraft(draft, dataset, staff, source);
-    if (lookupState !== 'found') next.id_card = 'Tra cứu hoặc tạo khách hàng trước khi lưu / in.';
+    const next = savingDraft ? validateDraftSave(draft, dataset) : validateContractDraft(draft, dataset, staff, source);
+    if (!savingDraft && lookupState !== 'found') next.id_card = 'Tra cứu hoặc tạo khách hàng trước khi lưu / in.';
     setErrors(next); setSaveError('');
     if (Object.keys(next).length) {
       const details = [...new Set(Object.values(next).filter(Boolean))].slice(0, 3).join(' ');
-      setSaveError(`Chưa thể ${savingRecord ? 'lưu hợp đồng' : 'tạo bản in'}. ${details}`);
+      setSaveError(`Chưa thể ${savingDraft ? 'lưu nháp' : savingRecord ? 'lưu hợp đồng' : 'tạo bản in'}. ${details}`);
       requestAnimationFrame(() => form.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()); return;
+    }
+    if (savingDraft) {
+      busy.current = true; setSaving(true);
+      try {
+        await saveContractDraft(row?.id ?? null, { draft: { ...draft, customer_lookup: idInput }, status: 'draft', rental_type: rentalType, notes,
+          ...(source === 'api' && row?.draft_revision ? { revision: String(row.draft_revision) } : {}) });
+        onClose(); onDraftSaved?.();
+      } catch (cause) { setSaveError(cause instanceof Error ? cause.message : 'Không lưu được bản nháp. Vui lòng thử lại.'); }
+      finally { busy.current = false; setSaving(false); }
+      return;
     }
     if (savingRecord && row) {
       busy.current = true; setSaving(true);
@@ -141,7 +155,7 @@ export function ContractComposer({ row, mode = 'print', onClose }: { row?: Manag
   function field(key: keyof Omit<ContractDraft, 'customer' | 'vehicles' | 'customer_id'>, label: string, type = 'text', required = false) {
     return <div className="mg-field" key={key}><label htmlFor={`contract-${key}`}>{label}{required && <span aria-hidden="true"> *</span>}</label>
       <input id={`contract-${key}`} name={key} type={type} value={String(draft[key])} required={required} min={type === 'number' ? 0 : undefined} step={type === 'number' ? 1 : undefined}
-        readOnly={mode === 'edit' && key === 'contract_number'}
+        readOnly={Boolean(row) && (mode === 'edit' || editingDraft) && key === 'contract_number'}
         aria-invalid={Boolean(errors[key])} aria-describedby={errors[key] ? `contract-${key}-error` : undefined} onChange={event => change(key, event.target.value)} />
       {errors[key] && <p id={`contract-${key}-error`} className="mg-field-error">{errors[key]}</p>}</div>;
   }
@@ -152,13 +166,13 @@ export function ContractComposer({ row, mode = 'print', onClose }: { row?: Manag
     { key: 'relatives_text', label: 'Thông tin người thân', wide: true }, { key: 'warning_note', label: 'Ghi chú / cảnh báo', wide: true },
   ];
   return <>
-    <Dialog title={mode === 'edit' ? 'Chỉnh sửa hợp đồng' : 'Điền và in hợp đồng'} subtitle={row ? `${row.code} · ID ${row.id}${mode === 'edit' ? ' · Dữ liệu mẫu' : ' · Thông tin soạn cho mẫu in'}` : 'Bản nháp · Chưa cấp số hợp đồng'} className="mg-contract-composer" onClose={() => { if (!busy.current) onClose(); }}>
+    <Dialog title={editingDraft ? row ? 'Chỉnh sửa bản nháp' : 'Nhập hợp đồng' : mode === 'edit' ? 'Chỉnh sửa hợp đồng' : 'Điền và in hợp đồng'} subtitle={row ? `${row.code} · ID ${row.id}${source === 'demo' ? ' · Dữ liệu mẫu' : ''}` : 'Bản nháp · Chưa cấp số hợp đồng'} className="mg-contract-composer" onClose={() => { if (!busy.current) onClose(); }}>
       <form ref={form} noValidate onSubmit={submit}>
         <div className="mg-dialog-body mg-composer-body">
-          <div className="mg-composer-notice">{mode === 'edit' ? 'Hợp đồng đã có trong danh sách. Chỉnh sửa và lưu trong phiên dữ liệu mẫu; bản in vẫn là bản nháp.' : source === 'demo' ? 'Đang dùng dữ liệu mẫu. Khách hàng mới chỉ lưu trong phiên xem trước. Thông tin hợp đồng đang soạn dùng cho bản in nháp.' : 'Tra cứu và tạo khách hàng qua hệ thống hiện có. Thông tin hợp đồng đang soạn dùng cho bản in nháp.'}</div>
+          <div className="mg-composer-notice">{canSaveDraft ? source === 'demo' ? 'Lưu nháp giữ thông tin đang nhập trong trình duyệt này, kể cả khi chưa điền đủ. Vào mục Lưu nháp để mở lại và tiếp tục sửa. Bản nháp chưa phát hành hợp đồng.' : canSaveContractDrafts ? 'Lưu nháp giữ thông tin đang nhập trên hệ thống, kể cả khi chưa điền đủ. Vào mục Lưu nháp để tiếp tục chỉnh sửa. Bản nháp chưa phát hành hợp đồng.' : 'Đang tra cứu dữ liệu hệ thống. Chức năng ghi bản nháp chưa được kết nối; thông tin đang nhập chưa được lưu.' : mode === 'edit' ? 'Hợp đồng đã có trong danh sách. Chỉnh sửa và lưu trong phiên dữ liệu mẫu; bản in vẫn là bản nháp.' : 'Điền thông tin để xem và in mẫu hợp đồng.'}</div>
           <fieldset className="mg-composer-fields" disabled={saving}>
-          {mode === 'edit' && <fieldset className="mg-composer-section"><legend>Thông tin bản ghi</legend><div className="mg-form-grid">
-            <div className="mg-field"><label htmlFor="contract-record-status">Trạng thái hợp đồng</label><select id="contract-record-status" value={status} onChange={event => setStatus(event.target.value)}>{CONTRACT_STATUSES.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
+          {(mode === 'edit' || canSaveDraft) && <fieldset className="mg-composer-section"><legend>Thông tin bản ghi</legend><div className="mg-form-grid">
+            {canSaveDraft ? <div className="mg-field"><span>Trạng thái hợp đồng</span><strong className="mg-status mg-status-amber">Lưu nháp</strong></div> : <div className="mg-field"><label htmlFor="contract-record-status">Trạng thái hợp đồng</label><select id="contract-record-status" value={status} onChange={event => setStatus(event.target.value)}>{CONTRACT_STATUSES.filter(option => option.value !== 'draft').map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>}
             <div className="mg-field"><label htmlFor="contract-record-type">Loại hợp đồng</label><select id="contract-record-type" value={rentalType} onChange={event => setRentalType(event.target.value)}>{CONTRACT_TYPES.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
             <div className="mg-field mg-field-wide"><label htmlFor="contract-record-notes">Ghi chú hợp đồng</label><textarea id="contract-record-notes" value={notes} onChange={event => setNotes(event.target.value)} /></div>
           </div></fieldset>}
@@ -206,8 +220,9 @@ export function ContractComposer({ row, mode = 'print', onClose }: { row?: Manag
           </div><p className="mg-composer-hint">Các số tiền là thông tin trên mẫu in. Không phát sinh giao dịch thu tiền hay nhận cọc.</p></fieldset>
           </fieldset>{saveError && <p className="mg-error-message" role="alert">{saveError}</p>}
         </div>
-        <div className="mg-dialog-footer"><span className="mg-form-note">* Thông tin bắt buộc</span><button type="button" className="mg-button" disabled={saving} onClick={onClose}>Đóng</button>
-          {mode === 'edit' && <button type="submit" className="mg-button mg-button-primary" disabled={saving || staffLoading || lookupState === 'loading'}>{saving ? <LoaderCircle size={16} className="mg-spin" /> : <Save size={16} />}{saving ? 'Đang lưu…' : 'Lưu hợp đồng'}</button>}
+        <div className="mg-dialog-footer"><span className="mg-form-note">{canSaveDraft ? '* Cần điền đủ để in; có thể lưu nháp trước' : '* Thông tin bắt buộc'}</span><button type="button" className="mg-button" disabled={saving} onClick={onClose}>Đóng</button>
+          {canSaveDraft && <button type="submit" value="draft" className="mg-button mg-button-primary" disabled={saving || !canSaveContractDrafts} title={!canSaveContractDrafts ? 'Chưa kết nối API lưu bản nháp' : undefined}>{saving ? <LoaderCircle size={16} className="mg-spin" /> : <Save size={16} />}{saving ? 'Đang lưu…' : 'Lưu nháp'}</button>}
+          {mode === 'edit' && !canSaveDraft && <button type="submit" className="mg-button mg-button-primary" disabled={saving || staffLoading || lookupState === 'loading'}>{saving ? <LoaderCircle size={16} className="mg-spin" /> : <Save size={16} />}{saving ? 'Đang lưu…' : 'Lưu hợp đồng'}</button>}
           <button type="submit" value="preview" className={`mg-button${mode === 'print' ? ' mg-button-primary' : ''}`} disabled={saving || staffLoading || lookupState === 'loading'}><Printer size={16} />Xem mẫu in</button></div>
       </form>
     </Dialog>

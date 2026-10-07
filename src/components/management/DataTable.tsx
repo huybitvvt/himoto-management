@@ -1,11 +1,9 @@
 'use client';
 
-import { ArrowDown, ArrowUp, ArrowUpDown, ArrowUpRight, Copy, Eye, FileSearch, LoaderCircle, Pencil, Printer, RotateCcw, Trash2 } from 'lucide-react';
-import Link from 'next/link';
+import { ArrowDown, ArrowUp, ArrowUpDown, Copy, Eye, FileSearch, LoaderCircle, Pencil, Printer, RotateCcw, Trash2 } from 'lucide-react';
 import { ManagementColumn, ManagementConfig, ManagementRow } from '@/lib/management/types';
 import { optionLabel, statusTone } from '@/lib/management/config';
 import { formatValue } from '@/lib/management/table-utils';
-import { rentalModuleUrl } from '@/lib/management/links';
 
 export function Cell({ row, column, config }: { row: ManagementRow; column: ManagementColumn; config: ManagementConfig }) {
   const value = row[column.key];
@@ -33,6 +31,7 @@ interface Props {
   onClone?: (row: ManagementRow) => void;
   cloningId?: number | null;
   canEditContract?: boolean;
+  canEditDraft?: boolean;
   canEdit: boolean;
   canDelete?: boolean;
   loading: boolean;
@@ -42,7 +41,7 @@ interface Props {
   onRetry: () => void;
 }
 
-export function DataTable({ config, columns, rows, offset, sortKey, sortDirection, onSort, onView, onEdit, onDelete, onPrint, onClone, cloningId, canEditContract, canEdit, canDelete, loading, error, isFiltered, onReset, onRetry }: Props) {
+export function DataTable({ config, columns, rows, offset, sortKey, sortDirection, onSort, onView, onEdit, onDelete, onPrint, onClone, cloningId, canEditContract, canEditDraft, canEdit, canDelete, loading, error, isFiltered, onReset, onRetry }: Props) {
   const columnCount = columns.length + 2;
   return <div className="mg-table-scroll" tabIndex={0} role="region" aria-label={`Bảng ${config.title.toLowerCase()}, cuộn ngang để xem thêm cột`}>
     <table className={`mg-table mg-table-${config.kind}`} aria-busy={loading}>
@@ -57,9 +56,8 @@ export function DataTable({ config, columns, rows, offset, sortKey, sortDirectio
         : rows.map((row, index) => <tr key={row.id}><td className="mg-index">{offset + index + 1}</td>{columns.map(column => <td key={column.key} className={column.align === 'right' ? 'mg-align-right' : ''}><Cell row={row} column={column} config={config} /></td>)}
           <td className="mg-actions-column"><div className={`mg-row-actions${onClone ? ' mg-contract-actions' : ''}`}><button className="mg-icon-button" type="button" aria-label={`Xem ${row.code}`} title="Xem chi tiết" onClick={() => onView(row)}><Eye size={17} /></button>
             {config.kind === 'contracts' && onPrint && <button className="mg-icon-button" type="button" aria-label={`Điền và in ${row.code}`} title="Điền và in hợp đồng" onClick={() => onPrint(row)}><Printer size={17} /></button>}
-            {canEditContract && <button className="mg-icon-button" type="button" aria-label={`Sửa ${row.code}`} title="Chỉnh sửa hợp đồng" onClick={() => onEdit(row)}><Pencil size={16} /></button>}
-            {config.kind === 'contracts' ? <Link className="mg-icon-button" href={rentalModuleUrl} aria-label={`Mở module đơn thuê xe từ ${row.code}`} title="Mở module đơn thuê xe"><ArrowUpRight size={17} /></Link>
-              : canEdit && <button className="mg-icon-button" type="button" aria-label={`Sửa ${row.code}`} title="Chỉnh sửa" onClick={() => onEdit(row)}><Pencil size={16} /></button>}
+            {(canEditContract || (canEditDraft && row.status === 'draft')) && <button className="mg-icon-button" type="button" aria-label={`Sửa ${row.code}`} title={row.status === 'draft' ? 'Tiếp tục sửa bản nháp' : 'Chỉnh sửa hợp đồng'} onClick={() => onEdit(row)}><Pencil size={16} /></button>}
+            {config.kind !== 'contracts' && canEdit && <button className="mg-icon-button" type="button" aria-label={`Sửa ${row.code}`} title="Chỉnh sửa" onClick={() => onEdit(row)}><Pencil size={16} /></button>}
             {canDelete && onDelete && <button className="mg-icon-button mg-delete-action" type="button" aria-label={`Xóa ${row.name}`} title="Xóa khách hàng" onClick={() => onDelete(row)}><Trash2 size={16} /></button>}
             {config.kind === 'contracts' && onClone && <button className="mg-button mg-clone-button" type="button" disabled={cloningId != null} aria-label={`Sao chép hợp đồng ${row.code}`} onClick={() => onClone(row)}>{cloningId === row.id ? <LoaderCircle size={14} className="mg-spin" /> : <Copy size={14} />}{cloningId === row.id ? 'Đang sao chép…' : 'Sao chép hợp đồng'}</button>}
           </div></td></tr>)}</tbody>

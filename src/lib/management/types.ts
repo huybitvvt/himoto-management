@@ -16,6 +16,7 @@ export interface ManagementRow {
 export type ManagementDataset = Record<ManagementKind, ManagementRow[]>;
 
 export interface ContractEdits {
+  revision?: string;
   draft: ContractDraft;
   status: string;
   rental_type: string;
@@ -26,10 +27,12 @@ export interface CustomerAssignment { status: string; store_id: number }
 
 export interface ManagementRepository {
   source: 'demo' | 'api';
+  supportsContractDrafts?: boolean;
   load(): Promise<ManagementDataset>;
   save(kind: EditableKind, row: ManagementRow): Promise<ManagementDataset>;
   cloneContract(id: number): Promise<ContractMutationResult>;
   saveContract(id: number, edits: ContractEdits): Promise<ContractMutationResult>;
+  saveContractDraft(id: number | null, edits: ContractEdits): Promise<ContractMutationResult>;
   reset(): Promise<ManagementDataset>;
 }
 

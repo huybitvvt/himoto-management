@@ -98,10 +98,10 @@ async function run() {
     const api = createApiRepository('/api');
     await assert.rejects(api.cloneContract(1), /Chưa có API/);
     await assert.rejects(api.saveContract(1, edits), /Chưa tích hợp/);
-    await assert.rejects(createApiAutofillRepository('/api').createCustomer(draft.customer, { status: 'blacklist', store_id: 1 }), /chưa hỗ trợ/);
+    await assert.rejects(createApiAutofillRepository('/api').createCustomer(draft.customer, { status: 'blacklist', store_id: 1 }), /CCCD/);
     assert.equal(requests, 0);
   } finally { global.fetch = originalFetch; }
-  checks.push('unconnected API operations fail explicitly without creating rental orders or dropping customer status/branch');
+  checks.push('unconnected contract APIs and invalid real customer identities fail before any request');
   console.log(JSON.stringify({ passed: checks.length, checks }, null, 2));
 }
 run().catch(error => { console.error(error); process.exitCode = 1; });

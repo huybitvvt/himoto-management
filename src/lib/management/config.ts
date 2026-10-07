@@ -11,8 +11,15 @@ export const VEHICLE_STATUSES: Option[] = [
 ];
 export const VEHICLE_TYPES: Option[] = [{ value: 'xega', label: 'Xe ga' }, { value: 'xeso', label: 'Xe số' }, { value: 'xecon', label: 'Xe côn tay' }, { value: 'xesh', label: 'Xe SH' }, { value: 'electric', label: 'Xe điện (mẫu)' }];
 export const POSITIONS: Option[] = ['Quản lý cơ sở', 'Nhân viên kinh doanh', 'Thu ngân', 'Kỹ thuật viên'].map(label => ({ value: label, label }));
-export const CONTRACT_STATUSES: Option[] = [{ value: 'renting', label: 'Đang thuê' }, { value: 'completed', label: 'Hoàn thành' }, { value: 'pending', label: 'Chờ giao xe' }, { value: 'overdue', label: 'Quá hạn' }, { value: 'cancelled', label: 'Đã hủy' }];
-export const CONTRACT_TYPES: Option[] = [{ value: 'daily', label: 'Thuê theo ngày' }, { value: 'monthly', label: 'Thuê theo tháng' }, { value: 'tour', label: 'Tour / phượt (mẫu)' }];
+export const CONTRACT_STATUSES: Option[] = [
+  { value: 'draft', label: 'Lưu nháp' }, { value: 'renting', label: 'Đang thuê' },
+  { value: 'completed', label: 'Hoàn thành' }, { value: 'pending', label: 'Chờ giao xe' },
+  { value: 'overdue', label: 'Quá hạn' }, { value: 'cancelled', label: 'Đã hủy' },
+  { value: 'bad_debt', label: 'Nợ xấu' }, { value: 'wait_payment', label: 'Chờ thanh toán' },
+  { value: 'deposit_contract', label: 'Hợp đồng đặt cọc' },
+  { value: 'cancel_pending_settlement', label: 'Chờ tất toán hủy' },
+];
+export const CONTRACT_TYPES: Option[] = [{ value: 'daily', label: 'Thuê theo ngày' }, { value: 'monthly', label: 'Thuê theo tháng' }, { value: 'rental', label: 'Thuê xe' }, { value: 'tour', label: 'Tour / phượt (mẫu)' }];
 const branchField = { key: 'store_id', label: 'Cơ sở', type: 'select' as const, storeOptions: true, required: true };
 const codeColumn = { key: 'code', label: 'Mã', format: 'code' as const };
 const statusColumn = { key: 'status', label: 'Trạng thái', format: 'status' as const };

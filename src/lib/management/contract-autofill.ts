@@ -57,7 +57,7 @@ const object = (value: unknown): value is ApiRecord => Boolean(value && typeof v
 export function createApiAutofillRepository(baseUrl = '/api'): ContractAutofillRepository {
   async function request(path: string, options: RequestInit = {}) {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') || localStorage.getItem('jwt_token') : null;
-    const response = await fetch(`${baseUrl.replace(/\/$/, '')}${path}`, { ...options, credentials: 'same-origin',
+    const response = await fetch(`${baseUrl.replace(/\/$/, '')}${path}`, { ...options, cache: 'no-store', credentials: 'same-origin',
       headers: { Accept: 'application/json', ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
     const envelope: unknown = await response.json().catch(() => null);
     if (!response.ok) {

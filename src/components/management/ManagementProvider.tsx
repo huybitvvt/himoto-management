@@ -12,6 +12,7 @@ interface ManagementContextValue {
   loading: boolean;
   error: string;
   source: 'demo' | 'api';
+  canSaveContractDrafts: boolean;
   selectedStore: string;
   selectStore: (id: string) => void;
   reload: () => Promise<void>;
@@ -24,6 +25,7 @@ interface ManagementContextValue {
   deleteCustomer: (id: number) => Promise<void>;
   cloneContract: (id: number) => Promise<ManagementRow>;
   saveContract: (id: number, edits: ContractEdits) => Promise<ManagementRow>;
+  saveContractDraft: (id: number | null, edits: ContractEdits) => Promise<ManagementRow>;
 }
 const ManagementContext = createContext<ManagementContextValue | null>(null);
 
@@ -69,6 +71,12 @@ export function ManagementProvider({ children }: { children: ReactNode }) {
     notify(`Đã lưu ${result.row.code}. Thay đổi chỉ lưu trong phiên xem trước.`);
     return result.row;
   };
+  const saveContractDraft = async (id: number | null, edits: ContractEdits) => {
+    const result = await repository.saveContractDraft(id, edits);
+    setDataset(result.dataset);
+    notify(`Đã lưu nháp ${result.row.code}${repository.source === 'demo' ? ' trong trình duyệt này' : ' vào Supabase'}. Mở mục Lưu nháp để tiếp tục chỉnh sửa.`);
+    return result.row;
+  };
   const createCustomer = async (customer: CustomerDetails, assignment?: CustomerAssignment) => {
     const row = await contractAutofill.createCustomer(customer, assignment);
     setDataset(current => {
@@ -92,7 +100,7 @@ export function ManagementProvider({ children }: { children: ReactNode }) {
     setDataset(current => current ? { ...current, customers: current.customers.filter(item => item.id !== id) } : current);
     notify(repository.source === 'demo' ? 'Đã xóa khách hàng khỏi phiên xem trước.' : 'Đã xóa hồ sơ khách hàng khỏi Supabase.');
   };
-  return <ManagementContext.Provider value={{ dataset, loading, error, source: repository.source, selectedStore, selectStore, reload, reset, save, notify, contractAutofill, createCustomer, updateCustomer, deleteCustomer, cloneContract, saveContract }}>
+  return <ManagementContext.Provider value={{ dataset, loading, error, source: repository.source, canSaveContractDrafts: repository.source === 'demo' || Boolean(repository.supportsContractDrafts), selectedStore, selectStore, reload, reset, save, notify, contractAutofill, createCustomer, updateCustomer, deleteCustomer, cloneContract, saveContract, saveContractDraft }}>
     {children}
     {notification && <div className="mg-toast" role="status"><span>{notification}</span><button type="button" onClick={() => notify('')} aria-label="Đóng thông báo">×</button></div>}
   </ManagementContext.Provider>;

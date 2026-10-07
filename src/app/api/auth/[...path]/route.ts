@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { himotoPool } from '@/lib/server/himoto-database';
+import { CONTRACT_LIST_SQL, DraftSaveError, saveDatabaseDraft } from '@/lib/server/contract-drafts';
 
 export const runtime = 'nodejs';
 
@@ -42,26 +43,7 @@ const listQueries: Record<string, QueryConfig> = {
           ORDER BY v.id DESC`,
   },
   'order/car-rental': {
-    sql: `SELECT o.id, o.contract_number, o.order_type AS rental_type, o.order_status AS status,
-                 o.customer_id, COALESCE(c.name, o.customer_name) AS customer_name,
-                 COALESCE(c.phone, o.customer_phone) AS customer_phone,
-                 o.store_id, s.store_name, o.rent_at AS start_date, o.return_at AS end_date,
-                 o.total AS total_amount,
-                 CASE WHEN o.first_deposit_amount IS NULL AND o.additional_deposit_amount IS NULL THEN NULL
-                      ELSE COALESCE(o.first_deposit_amount, 0) + COALESCE(o.additional_deposit_amount, 0) END AS deposit_amount,
-                 o.note AS notes, o.contract_responsible_user_id AS staff_id,
-                 COALESCE(ov.vehicles, '[]'::json) AS vehicles
-          FROM himoto.orders o
-          LEFT JOIN himoto.customers c ON c.id = o.customer_id
-          LEFT JOIN himoto.stores s ON s.id = o.store_id
-          LEFT JOIN LATERAL (
-            SELECT json_agg(json_build_object('id', v.id, 'name', v.name, 'license', v.license) ORDER BY d.id) AS vehicles
-            FROM himoto.order_vehicle_details d
-            LEFT JOIN himoto.vehicles v ON v.id = d.vehicle_id
-            WHERE d.order_id = o.id AND d.deleted_at IS NULL
-          ) ov ON true
-          WHERE o.deleted_at IS NULL
-          ORDER BY o.id DESC`,
+    sql: `${CONTRACT_LIST_SQL} ORDER BY o.id DESC`,
   },
   transactions: {
     sql: `SELECT t.id, t.created_at, t.type, t.user_id, u.name AS user_name, t.store_id,
@@ -76,7 +58,26 @@ async function readAll(query: QueryConfig) {
   const data = await himotoPool.query(query.sql);
   // The UI filters and sorts locally, so return each current dataset in one
   // response instead of making dozens of sequential page requests.
-  return NextResponse.json({ status: 'success', data: data.rows });
+  return NextResponse.json({ status: 'success', data: data.rows }, { headers: { 'Cache-Control': 'no-store' } });
+}
+
+async function writeDraft(request: NextRequest, id: number | null) {
+  let client;
+  try {
+    const body: unknown = await request.json();
+    client = await himotoPool.connect();
+    await client.query('BEGIN');
+    const row = await saveDatabaseDraft(client, id, body);
+    await client.query('COMMIT');
+    return NextResponse.json({ status: 'success', data: row }, { headers: { 'Cache-Control': 'no-store' } });
+  } catch (error) {
+    if (client) await client.query('ROLLBACK');
+    if (error instanceof DraftSaveError) return NextResponse.json({ status: 'error', message: error.message }, { status: error.status });
+    if (error instanceof SyntaxError) return NextResponse.json({ status: 'error', message: 'Thông tin bản nháp không hợp lệ.' }, { status: 400 });
+    if (error && typeof error === 'object' && 'code' in error && error.code === '23505') return NextResponse.json({ status: 'error', message: 'Mã bản nháp đã được sử dụng.' }, { status: 409 });
+    console.error('Supabase draft write failed:', error instanceof Error ? error.name : 'Unknown database error');
+    return NextResponse.json({ status: 'error', message: 'Không lưu được bản nháp vào Supabase. Thông tin đang nhập vẫn được giữ trong form.' }, { status: 500 });
+  } finally { client?.release(); }
 }
 
 export async function GET(request: NextRequest, { params }: Params) {
@@ -132,6 +133,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 export async function POST(request: NextRequest, { params }: Params) {
   if (process.env.NODE_ENV !== 'development') return NextResponse.json({ status: 'error' }, { status: 404 });
   const { path } = await params;
+  if (path.join('/') === 'order/car-rental') return writeDraft(request, null);
   if (path.join('/') === 'hr/staff/refill-branches') {
     try {
       const result = await himotoPool.query(
@@ -223,6 +225,13 @@ async function getCustomerId(params: Params['params']) {
   if (path.length !== 2 || path[0] !== 'customers' || !/^\d+$/.test(path[1])) return null;
   const id = Number(path[1]);
   return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+export async function PUT(request: NextRequest, { params }: Params) {
+  if (process.env.NODE_ENV !== 'development') return NextResponse.json({ status: 'error' }, { status: 404 });
+  const { path } = await params;
+  if (path.length !== 3 || path[0] !== 'order' || path[1] !== 'car-rental' || !/^\d+$/.test(path[2])) return NextResponse.json({ status: 'error' }, { status: 404 });
+  return writeDraft(request, Number(path[2]));
 }
 
 export async function PATCH(request: NextRequest, { params }: Params) {
