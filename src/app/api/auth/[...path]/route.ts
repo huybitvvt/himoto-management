@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { himotoPool } from '@/lib/server/himoto-database';
 import { CONTRACT_LIST_SQL, DraftSaveError, saveDatabaseDraft } from '@/lib/server/contract-drafts';
+import { protectDatabaseRequest } from '@/lib/server/management-session';
 
 export const runtime = 'nodejs';
 
@@ -81,9 +82,8 @@ async function writeDraft(request: NextRequest, id: number | null) {
 }
 
 export async function GET(request: NextRequest, { params }: Params) {
-  // This local integration has no application login yet. Never expose these
-  // database-backed routes from a production deployment without adding auth.
-  if (process.env.NODE_ENV !== 'development') return NextResponse.json({ status: 'error' }, { status: 404 });
+  const denied = await protectDatabaseRequest(request);
+  if (denied) return denied;
 
   const { path } = await params;
   const key = path.join('/');
@@ -131,7 +131,8 @@ export async function GET(request: NextRequest, { params }: Params) {
 }
 
 export async function POST(request: NextRequest, { params }: Params) {
-  if (process.env.NODE_ENV !== 'development') return NextResponse.json({ status: 'error' }, { status: 404 });
+  const denied = await protectDatabaseRequest(request);
+  if (denied) return denied;
   const { path } = await params;
   if (path.join('/') === 'order/car-rental') return writeDraft(request, null);
   if (path.join('/') === 'hr/staff/refill-branches') {
@@ -228,14 +229,16 @@ async function getCustomerId(params: Params['params']) {
 }
 
 export async function PUT(request: NextRequest, { params }: Params) {
-  if (process.env.NODE_ENV !== 'development') return NextResponse.json({ status: 'error' }, { status: 404 });
+  const denied = await protectDatabaseRequest(request);
+  if (denied) return denied;
   const { path } = await params;
   if (path.length !== 3 || path[0] !== 'order' || path[1] !== 'car-rental' || !/^\d+$/.test(path[2])) return NextResponse.json({ status: 'error' }, { status: 404 });
   return writeDraft(request, Number(path[2]));
 }
 
 export async function PATCH(request: NextRequest, { params }: Params) {
-  if (process.env.NODE_ENV !== 'development') return NextResponse.json({ status: 'error' }, { status: 404 });
+  const denied = await protectDatabaseRequest(request);
+  if (denied) return denied;
   const id = await getCustomerId(params);
   if (!id) return NextResponse.json({ status: 'error', message: 'Mã khách hàng không hợp lệ.' }, { status: 400 });
 
@@ -299,8 +302,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 }
 
-export async function DELETE(_request: NextRequest, { params }: Params) {
-  if (process.env.NODE_ENV !== 'development') return NextResponse.json({ status: 'error' }, { status: 404 });
+export async function DELETE(request: NextRequest, { params }: Params) {
+  const denied = await protectDatabaseRequest(request);
+  if (denied) return denied;
   const id = await getCustomerId(params);
   if (!id) return NextResponse.json({ status: 'error', message: 'Mã khách hàng không hợp lệ.' }, { status: 400 });
   const client = await himotoPool.connect();

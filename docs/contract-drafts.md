@@ -1,7 +1,7 @@
 # Nhập hợp đồng và lưu nháp — 07/10/2026
 
 - `/contracts`: danh sách hợp đồng, nút **Nhập hợp đồng**, tab **Lưu nháp**, trạng thái **Nợ xấu**.
-- `/contracts/drafts`: chỉ liệt kê hợp đồng `draft`; mở bằng nút sửa để tiếp tục và **Lưu nháp** để cập nhật cùng ID/mã.
+- `/contracts/drafts`: mục **Log**, chỉ liệt kê hợp đồng `draft`; mở bằng nút sửa để tiếp tục và **Lưu nháp** để cập nhật cùng ID/mã.
 - Có thể lưu khi chưa điền đủ khách, nhân sự, xe hoặc thời gian. Dữ liệu đã nhập phải có giá trị hợp lệ; in vẫn yêu cầu đủ thông tin.
 - Xem chi tiết và mở mẫu in trong giao diện mới; không chuyển sang web Render cũ.
 - **Làm mới** tải lại dữ liệu API với `cache: no-store`; API lỗi không thay bằng dữ liệu mẫu.

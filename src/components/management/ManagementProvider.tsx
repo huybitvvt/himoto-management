@@ -74,7 +74,7 @@ export function ManagementProvider({ children }: { children: ReactNode }) {
   const saveContractDraft = async (id: number | null, edits: ContractEdits) => {
     const result = await repository.saveContractDraft(id, edits);
     setDataset(result.dataset);
-    notify(`Đã lưu nháp ${result.row.code}${repository.source === 'demo' ? ' trong trình duyệt này' : ' vào Supabase'}. Mở mục Lưu nháp để tiếp tục chỉnh sửa.`);
+    notify(`Đã lưu nháp ${result.row.code}${repository.source === 'demo' ? ' trong trình duyệt này' : ' vào Supabase'}. Mở mục Log để tiếp tục chỉnh sửa.`);
     return result.row;
   };
   const createCustomer = async (customer: CustomerDetails, assignment?: CustomerAssignment) => {

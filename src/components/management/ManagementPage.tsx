@@ -20,7 +20,7 @@ const EMPTY_ROWS: ManagementRow[] = [];
 
 function ManagementContent({ kind, draftsOnly = false }: { kind: ManagementKind; draftsOnly?: boolean }) {
   const baseConfig = MANAGEMENT_CONFIG[kind];
-  const config = draftsOnly ? { ...baseConfig, title: 'Lưu nháp', description: 'Hợp đồng đang nhập hoặc đang sửa. Mở bản nháp để tiếp tục và lưu cập nhật.' } : baseConfig;
+  const config = draftsOnly ? { ...baseConfig, title: 'Log', description: 'Hợp đồng đang nhập hoặc đang sửa. Mở bản nháp để tiếp tục và lưu cập nhật.' } : baseConfig;
   const { dataset, loading, error, source, canSaveContractDrafts, selectedStore, selectStore, reload, notify, cloneContract, deleteCustomer } = useManagement();
   const router = useRouter();
   const searchParams = useSearchParams();

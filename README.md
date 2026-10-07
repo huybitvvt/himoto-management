@@ -13,12 +13,14 @@ npm run test:management
 npm run test:contracts
 npm run test:clone
 npm run test:cashbook
+npm run test:drafts
+npm run test:login
 npm run build
 ```
 
-Mở http://localhost:3000. Mặc định dùng dữ liệu mẫu; thêm/sửa chỉ giữ trong phiên xem trước, không ghi database. Không có backend hay secret trong repo này. Backend dự kiến NestJS, giữ database hiện có.
+Mở http://localhost:3000 để vào màn đăng nhập với ảnh nền HIMOTO. Mặc định dùng dữ liệu mẫu qua nút **Xem bản demo**. Bản nháp hợp đồng giữ trong trình duyệt qua lần tải lại; các thay đổi mẫu khác chỉ giữ trong phiên. Có thể kết nối Supabase khi chạy local bằng `.env.local` và đăng nhập tài khoản quản trị hiện có; xem [đăng nhập](docs/login.md) và [cấu hình Supabase](docs/supabase-local.md). Secret không được đưa vào repo.
 
-Module đơn thuê xe không được xây dựng lại. Liên kết mở ứng dụng hiện có qua `NEXT_PUBLIC_RENTAL_APP_URL`. Component đọc chi tiết của module cũ được dùng lại.
+Module đơn thuê xe không được xây dựng lại. Component đọc chi tiết của module cũ được dùng lại ngay trong trang quản lý.
 
 Tại **Danh sách hợp đồng → Điền và in hợp đồng**, chọn cơ sở để lọc dropdown nhân sự; nhập `DEMO-000001` để thử auto-fill toàn bộ hồ sơ khách hàng. CCCD 12 số / CMND 9 số chưa có sẽ mở popup tạo khách hàng ngay tại màn hình. Mẫu in cũ A4 ngang được chuyển nguyên nội dung/bố cục, tự đổ thông tin và có phụ lục khi chọn nhiều xe. Có thể in hoặc lưu PDF bằng hộp thoại in. Bản soạn là nháp, không cấp số hoặc tạo đơn thuê xe.
 

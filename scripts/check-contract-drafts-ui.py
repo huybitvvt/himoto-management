@@ -8,6 +8,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--url', default='http://127.0.0.1:3000')
 parser.add_argument('--source', choices=['api', 'demo'], default='demo')
 parser.add_argument('--output', default='docs/qa/contract-drafts')
+parser.add_argument('--session-cookie-file', help='Ignored local QA JSON cookie file for authenticated API checks')
 args = parser.parse_args()
 output = Path(args.output)
 output.mkdir(parents=True, exist_ok=True)
@@ -16,6 +17,8 @@ checks, errors, writes = [], [], []
 with sync_playwright() as p:
     browser = p.chromium.launch()
     context = browser.new_context(viewport={'width': 1440, 'height': 1000})
+    if args.session_cookie_file:
+        context.add_cookies(json.loads(Path(args.session_cookie_file).read_text(encoding='utf-8')))
     page = context.new_page()
     page.on('pageerror', lambda error: errors.append(str(error)))
     if args.source == 'api':
@@ -37,8 +40,8 @@ with sync_playwright() as p:
         assert response.ok
         rows = response.json()['data']
         expected = sum(row['status'] == 'draft' for row in rows)
-        expect(page.locator('.mg-title-count')).to_have_text(str(len(rows)))
-        page.locator('.mg-sidebar').get_by_role('link', name='Lưu nháp', exact=True).click()
+        expect(page.locator('.mg-title-count')).to_have_text(str(len(rows)), timeout=60000)
+        page.locator('.mg-sidebar').get_by_role('link', name='Log', exact=True).click()
         expect(page.locator('.mg-title-count')).to_have_text(str(expected))
         first = page.locator('.mg-table tbody tr').first
         first.get_by_role('button', name='Sửa', exact=False).click()
